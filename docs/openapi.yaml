@@ -46,7 +46,6 @@ paths:
                 role: MANAGER
                 count_of_all_deals: 42
                 count_clients: 18
-                count_active_deals: 12
                 count_tasks: 7
                 activities:
                   - actor_name: Булат Ахметов
@@ -307,6 +306,116 @@ paths:
                 code: INTERNAL_ERROR
                 message: Не удалось получить профиль клиента
 
+  /api/deals/:
+    get:
+      tags:
+        - Deals
+      summary: Получить Kanban-доску сделок
+      description: |
+        Возвращает все активные воронки компании текущего пользователя.
+        Для каждой воронки возвращаются её стадии, а для каждой стадии — сделки.
+
+        Стадии сортируются по полю `position`. Пустые стадии также возвращаются
+        с пустым массивом `deals`.
+
+        В каждой сделке возвращаются данные клиента. Для клиента типа `PERSON`
+        поле `company_name` имеет значение `null`, и frontend использует
+        `first_name` и `last_name`. Для клиента типа `COMPANY` frontend может
+        использовать `company_name`.
+      operationId: getDealsBoard
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Воронки со стадиями и сделками успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DealsBoardResponse"
+              example:
+                pipelines:
+                  - id: "00000000-0000-4000-8000-000000000001"
+                    name: Продажи
+                    deal_count: 2
+                    stages:
+                      - id: "00000000-0000-4000-8000-000000000011"
+                        name: Новый
+                        position: 1
+                        deal_count: 1
+                        deals:
+                          - id: "00000000-0000-4000-8000-000000000101"
+                            title: Разработка сайта
+                            description: Создание корпоративного сайта
+                            amount: 150000
+                            currency: RUB
+                            expected_close_at: "2026-10-01T12:00:00Z"
+                            responsible_user_name: Булат Ахметов
+                            client:
+                              id: "00000000-0000-4000-8000-000000000201"
+                              client_type: PERSON
+                              first_name: Иван
+                              last_name: Петров
+                              company_name: null
+                      - id: "00000000-0000-4000-8000-000000000012"
+                        name: Переговоры
+                        position: 2
+                        deal_count: 1
+                        deals:
+                          - id: "00000000-0000-4000-8000-000000000102"
+                            title: Поставка оборудования
+                            description: null
+                            amount: 340000
+                            currency: RUB
+                            expected_close_at: null
+                            responsible_user_name: Анна Смирнова
+                            client:
+                              id: "00000000-0000-4000-8000-000000000202"
+                              client_type: COMPANY
+                              first_name: Алексей
+                              last_name: Сидоров
+                              company_name: ООО Ромашка
+                      - id: "00000000-0000-4000-8000-000000000013"
+                        name: Договор
+                        position: 3
+                        deal_count: 0
+                        deals: []
+                  - id: "00000000-0000-4000-8000-000000000002"
+                    name: Повторные продажи
+                    deal_count: 0
+                    stages:
+                      - id: "00000000-0000-4000-8000-000000000021"
+                        name: Новая заявка
+                        position: 1
+                        deal_count: 0
+                        deals: []
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "403":
+          description: Пользователь не имеет доступа к сделкам
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: FORBIDDEN
+                message: Доступ запрещён
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить Kanban-доску сделок
+
 components:
   securitySchemes:
     bearerAuth:
@@ -324,7 +433,6 @@ components:
         - role
         - count_of_all_deals
         - count_clients
-        - count_active_deals
         - count_tasks
         - activities
         - tasks
@@ -353,12 +461,6 @@ components:
           minimum: 0
           description: Общее количество клиентов компании
           example: 18
-        count_active_deals:
-          type: integer
-          format: int64
-          minimum: 0
-          description: Количество активных сделок компании
-          example: 12
         count_tasks:
           type: integer
           format: int64
@@ -634,6 +736,182 @@ components:
           format: date-time
           description: Дата и время создания комментария
           example: "2026-09-18T08:15:00Z"
+
+    DealsBoardResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - pipelines
+      properties:
+        pipelines:
+          type: array
+          description: Воронки компании со стадиями и сделками
+          items:
+            $ref: "#/components/schemas/DealsBoardPipeline"
+
+    DealsBoardPipeline:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - deal_count
+        - stages
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор воронки
+          example: "00000000-0000-4000-8000-000000000001"
+        name:
+          type: string
+          maxLength: 150
+          description: Название воронки
+          example: Продажи
+        deal_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Общее количество сделок в воронке
+          example: 18
+        stages:
+          type: array
+          description: Стадии воронки, отсортированные по position
+          items:
+            $ref: "#/components/schemas/DealsBoardStage"
+
+    DealsBoardStage:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - position
+        - deal_count
+        - deals
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор стадии
+          example: "00000000-0000-4000-8000-000000000011"
+        name:
+          type: string
+          maxLength: 150
+          description: Название стадии
+          example: Переговоры
+        position:
+          type: integer
+          minimum: 1
+          description: Позиция стадии внутри воронки
+          example: 2
+        deal_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Количество сделок на стадии
+          example: 5
+        deals:
+          type: array
+          description: Сделки, находящиеся на стадии
+          items:
+            $ref: "#/components/schemas/DealsBoardItem"
+
+    DealsBoardItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - description
+        - amount
+        - currency
+        - expected_close_at
+        - responsible_user_name
+        - client
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор сделки
+          example: "00000000-0000-4000-8000-000000000101"
+        title:
+          type: string
+          maxLength: 255
+          description: Название сделки
+          example: Разработка сайта
+        description:
+          type: string
+          nullable: true
+          description: Описание сделки
+          example: Создание корпоративного сайта
+        amount:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          description: Сумма сделки
+          example: 150000
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: Код валюты
+          example: RUB
+        expected_close_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ожидаемая дата закрытия сделки
+          example: "2026-10-01T12:00:00Z"
+        responsible_user_name:
+          type: string
+          nullable: true
+          description: Полное имя ответственного сотрудника или null
+          example: Булат Ахметов
+        client:
+          $ref: "#/components/schemas/DealsBoardClient"
+
+    DealsBoardClient:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - client_type
+        - first_name
+        - last_name
+        - company_name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор клиента
+          example: "00000000-0000-4000-8000-000000000201"
+        client_type:
+          type: string
+          description: Тип клиента
+          enum:
+            - PERSON
+            - COMPANY
+          example: COMPANY
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Имя физического лица или представителя юридического лица
+          example: Алексей
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Фамилия физического лица или представителя юридического лица
+          example: Сидоров
+        company_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Название компании; для клиента типа PERSON имеет значение null
+          example: ООО Ромашка
 
     ErrorResponse:
       type: object
