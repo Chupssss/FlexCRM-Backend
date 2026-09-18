@@ -306,6 +306,172 @@ paths:
                 code: INTERNAL_ERROR
                 message: Не удалось получить профиль клиента
 
+  /api/users/:
+    get:
+      tags:
+        - Users
+      summary: Получить сотрудников для выбора ответственного
+      description: |
+        Возвращает активных сотрудников компании текущего пользователя.
+        Используется для заполнения выпадающего списка ответственных при создании сделки.
+      operationId: getUsers
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Список сотрудников успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserOption"
+              example:
+                - id: "00000000-0000-4000-8000-000000000011"
+                  first_name: Булат
+                  last_name: Ахметов
+                - id: "00000000-0000-4000-8000-000000000012"
+                  first_name: Анна
+                  last_name: Смирнова
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить список сотрудников
+
+  /api/pipelines/:
+    get:
+      tags:
+        - Pipelines
+      summary: Получить воронки для создания сделки
+      description: |
+        Возвращает активные воронки компании текущего пользователя.
+        Компания определяется backend по авторизованному пользователю.
+      operationId: getPipelines
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Список воронок успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PipelineOption"
+              example:
+                - id: "00000000-0000-4000-8000-000000000021"
+                  name: Продажи
+                - id: "00000000-0000-4000-8000-000000000022"
+                  name: Повторные продажи
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить список воронок
+
+  /api/pipelines/{pipeline_id}/stages/:
+    get:
+      tags:
+        - Pipelines
+      summary: Получить стадии выбранной воронки
+      description: |
+        Возвращает все стадии выбранной воронки, отсортированные по `position`.
+        Воронка должна принадлежать компании текущего пользователя.
+      operationId: getPipelineStages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: pipeline_id
+          in: path
+          required: true
+          description: UUID воронки
+          schema:
+            type: string
+            format: uuid
+          example: "00000000-0000-4000-8000-000000000021"
+      responses:
+        "200":
+          description: Список стадий успешно получен
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StageOption"
+              example:
+                - id: "00000000-0000-4000-8000-000000000031"
+                  name: Новый
+                  position: 1
+                - id: "00000000-0000-4000-8000-000000000032"
+                  name: Переговоры
+                  position: 2
+                - id: "00000000-0000-4000-8000-000000000033"
+                  name: Договор
+                  position: 3
+        "400":
+          description: Идентификатор воронки имеет некорректный формат
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_PIPELINE_ID
+                message: Идентификатор воронки должен быть UUID
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "404":
+          description: Воронка не найдена в компании текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: PIPELINE_NOT_FOUND
+                message: Воронка не найдена
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить стадии воронки
+
   /api/deals/:
     get:
       tags:
@@ -415,6 +581,102 @@ paths:
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить Kanban-доску сделок
+
+    post:
+      tags:
+        - Deals
+      summary: Создать сделку
+      description: |
+        Создаёт новую сделку в выбранной воронке и на выбранной стадии.
+
+        `company_id` и `created_by` не передаются frontend: backend определяет
+        их по текущему авторизованному пользователю.
+
+        Backend проверяет, что клиент, ответственный сотрудник и воронка
+        принадлежат компании текущего пользователя, а стадия принадлежит
+        выбранной воронке.
+      operationId: createDeal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDealRequest"
+            example:
+              title: Поставка оборудования
+              client_id: "00000000-0000-4000-8000-000000000002"
+              responsible_user_id: "00000000-0000-4000-8000-000000000011"
+              pipeline_id: "00000000-0000-4000-8000-000000000021"
+              stage_id: "00000000-0000-4000-8000-000000000032"
+              amount: 100000
+              currency: RUB
+              description: null
+              expected_close_at: null
+      responses:
+        "201":
+          description: Сделка успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDealResponse"
+              example:
+                id: "00000000-0000-4000-8000-000000000101"
+                title: Поставка оборудования
+                client_id: "00000000-0000-4000-8000-000000000002"
+                responsible_user_id: "00000000-0000-4000-8000-000000000011"
+                pipeline_id: "00000000-0000-4000-8000-000000000021"
+                stage_id: "00000000-0000-4000-8000-000000000032"
+                amount: 100000
+                currency: RUB
+                description: null
+                expected_close_at: null
+                created_at: "2026-09-18T12:30:00Z"
+        "400":
+          description: Некорректное тело запроса или ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidBody:
+                  summary: Некорректный JSON
+                  value:
+                    code: INVALID_REQUEST_BODY
+                    message: Некорректное тело запроса
+                negativeAmount:
+                  summary: Отрицательная сумма сделки
+                  value:
+                    code: INVALID_AMOUNT
+                    message: Сумма сделки не может быть отрицательной
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "404":
+          description: Клиент, сотрудник, воронка или стадия не найдены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: RELATED_ENTITY_NOT_FOUND
+                message: Один из выбранных объектов не найден
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось создать сделку
 
 components:
   securitySchemes:
@@ -736,6 +998,210 @@ components:
           format: date-time
           description: Дата и время создания комментария
           example: "2026-09-18T08:15:00Z"
+
+    UserOption:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - first_name
+        - last_name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор сотрудника
+          example: "00000000-0000-4000-8000-000000000011"
+        first_name:
+          type: string
+          maxLength: 100
+          description: Имя сотрудника
+          example: Булат
+        last_name:
+          type: string
+          maxLength: 100
+          description: Фамилия сотрудника
+          example: Ахметов
+
+    PipelineOption:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор воронки
+          example: "00000000-0000-4000-8000-000000000021"
+        name:
+          type: string
+          maxLength: 150
+          description: Название воронки
+          example: Продажи
+
+    StageOption:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - position
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор стадии
+          example: "00000000-0000-4000-8000-000000000032"
+        name:
+          type: string
+          maxLength: 150
+          description: Название стадии
+          example: Переговоры
+        position:
+          type: integer
+          minimum: 1
+          description: Позиция стадии внутри воронки
+          example: 2
+
+    CreateDealRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - client_id
+        - responsible_user_id
+        - pipeline_id
+        - stage_id
+        - amount
+        - currency
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Название сделки
+          example: Поставка оборудования
+        client_id:
+          type: string
+          format: uuid
+          description: UUID выбранного клиента
+          example: "00000000-0000-4000-8000-000000000002"
+        responsible_user_id:
+          type: string
+          format: uuid
+          description: UUID выбранного ответственного сотрудника
+          example: "00000000-0000-4000-8000-000000000011"
+        pipeline_id:
+          type: string
+          format: uuid
+          description: UUID выбранной воронки
+          example: "00000000-0000-4000-8000-000000000021"
+        stage_id:
+          type: string
+          format: uuid
+          description: UUID выбранной стадии
+          example: "00000000-0000-4000-8000-000000000032"
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Сумма сделки
+          example: 100000
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: RUB
+          description: Трёхбуквенный код валюты
+          example: RUB
+        description:
+          type: string
+          nullable: true
+          description: Дополнительное описание сделки
+          example: null
+        expected_close_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ожидаемая дата закрытия сделки
+          example: null
+
+    CreateDealResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - client_id
+        - responsible_user_id
+        - pipeline_id
+        - stage_id
+        - amount
+        - currency
+        - description
+        - expected_close_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID созданной сделки
+          example: "00000000-0000-4000-8000-000000000101"
+        title:
+          type: string
+          maxLength: 255
+          description: Название сделки
+          example: Поставка оборудования
+        client_id:
+          type: string
+          format: uuid
+          description: UUID клиента
+          example: "00000000-0000-4000-8000-000000000002"
+        responsible_user_id:
+          type: string
+          format: uuid
+          description: UUID ответственного сотрудника
+          example: "00000000-0000-4000-8000-000000000011"
+        pipeline_id:
+          type: string
+          format: uuid
+          description: UUID воронки
+          example: "00000000-0000-4000-8000-000000000021"
+        stage_id:
+          type: string
+          format: uuid
+          description: UUID стадии
+          example: "00000000-0000-4000-8000-000000000032"
+        amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Сумма сделки
+          example: 100000
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: Код валюты
+          example: RUB
+        description:
+          type: string
+          nullable: true
+          description: Описание сделки
+          example: null
+        expected_close_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ожидаемая дата закрытия сделки
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время создания сделки
+          example: "2026-09-18T12:30:00Z"
 
     DealsBoardResponse:
       type: object
