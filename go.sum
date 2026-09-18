@@ -1,0 +1,8 @@
+github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c h1:pxW6RcqyfI9/kWtOwnv/G+AzdKuy2ZrqINhenH4HyNs=
+github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
+github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
+github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
+golang.org/x/tools v0.44.1-0.20260420230617-19499e7caabc h1:vSv/HN1q9eoPD7lMyJYVJ/GPYnqtqu6adMxUmrxOB78=
+golang.org/x/tools v0.44.1-0.20260420230617-19499e7caabc/go.mod h1:KA0AfVErSdxRZIsOVipbv3rQhVXTnlU6UhKxHd1seDI=
+honnef.co/go/tools v0.8.1 h1:+JKf3xJ1ni4CwrhVg4/pqsfPGP6vNAXcKbMXJodYx3w=
+honnef.co/go/tools v0.8.1/go.mod h1:XA+OnlRA9EDh/ukGvXMNSZNKGwFQJ+5dER0ioUkOxks=
