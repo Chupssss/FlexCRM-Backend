@@ -184,6 +184,129 @@ paths:
                 code: INTERNAL_ERROR
                 message: Не удалось получить список клиентов
 
+  /api/clients/{id}/:
+    get:
+      tags:
+        - Clients
+      summary: Получить профиль клиента
+      description: |
+        Возвращает подробную информацию о конкретном клиенте компании
+        текущего пользователя.
+
+        Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
+        данные физического лица, `company_name` имеет значение `null`,
+        а `contacts` является пустым массивом.
+
+        Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
+        данные представителя юридического лица, `company_name` — название
+        компании, а `contacts` — остальных сотрудников этой компании.
+
+        Представитель юридического лица в массиве `contacts` не дублируется.
+      operationId: getClientById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID клиента
+          schema:
+            type: string
+            format: uuid
+          example: "78aa9c44-8a52-49e8-8281-751acef4032e"
+      responses:
+        "200":
+          description: Профиль клиента успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientDetail"
+              examples:
+                person:
+                  summary: Физическое лицо
+                  value:
+                    id: "585f996c-8106-442c-91c7-290d30b839ee"
+                    client_type: PERSON
+                    first_name: Алексей
+                    last_name: Сидоров
+                    company_name: null
+                    phone: "+79995554433"
+                    email: alexey@example.com
+                    responsible_user_name: Булат Ахметов
+                    description: Заинтересован в услугах компании
+                    last_comment: null
+                    tags:
+                      - Потенциальный
+                    contacts: []
+                company:
+                  summary: Юридическое лицо
+                  value:
+                    id: "78aa9c44-8a52-49e8-8281-751acef4032e"
+                    client_type: COMPANY
+                    first_name: Иван
+                    last_name: Петров
+                    company_name: ООО Ромашка
+                    phone: "+74951234567"
+                    email: info@romashka.ru
+                    responsible_user_name: Анна Смирнова
+                    description: Компания занимается поставкой оборудования
+                    last_comment:
+                      text: Отправили коммерческое предложение
+                      author_name: Булат Ахметов
+                      created_at: "2026-09-18T08:15:00Z"
+                    tags:
+                      - B2B
+                      - Крупный клиент
+                    contacts:
+                      - id: "00000000-0000-4000-8000-000000000001"
+                        first_name: Мария
+                        last_name: Соколова
+                        phone: "+79990002233"
+                        email: maria@romashka.ru
+                        position: Бухгалтер
+                      - id: "00000000-0000-4000-8000-000000000002"
+                        first_name: Алексей
+                        last_name: Орлов
+                        phone: "+79990003344"
+                        email: alexey@romashka.ru
+                        position: Менеджер по закупкам
+        "400":
+          description: Идентификатор клиента имеет некорректный формат
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_CLIENT_ID
+                message: Идентификатор клиента должен быть UUID
+        "401":
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        "404":
+          description: Клиент не найден в компании текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: CLIENT_NOT_FOUND
+                message: Клиент не найден
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить профиль клиента
+
 components:
   securitySchemes:
     bearerAuth:
@@ -352,6 +475,165 @@ components:
           nullable: true
           description: Полное имя ответственного сотрудника
           example: Булат Ахметов
+
+    ClientDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - client_type
+        - first_name
+        - last_name
+        - company_name
+        - phone
+        - email
+        - responsible_user_name
+        - description
+        - last_comment
+        - tags
+        - contacts
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор клиента
+          example: "78aa9c44-8a52-49e8-8281-751acef4032e"
+        client_type:
+          type: string
+          description: Тип клиента
+          enum:
+            - PERSON
+            - COMPANY
+          example: COMPANY
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Имя физического лица или представителя юридического лица
+          example: Иван
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Фамилия физического лица или представителя юридического лица
+          example: Петров
+        company_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Название компании; для клиента типа PERSON имеет значение null
+          example: ООО Ромашка
+        phone:
+          type: string
+          nullable: true
+          maxLength: 50
+          description: Телефон клиента или юридического лица
+          example: "+74951234567"
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 255
+          description: Электронная почта клиента или юридического лица
+          example: info@romashka.ru
+        responsible_user_name:
+          type: string
+          nullable: true
+          description: Полное имя ответственного сотрудника или null
+          example: Анна Смирнова
+        description:
+          type: string
+          nullable: true
+          description: Дополнительное описание клиента
+          example: Компания занимается поставкой оборудования
+        last_comment:
+          $ref: "#/components/schemas/ClientLastComment"
+        tags:
+          type: array
+          description: Теги клиента
+          items:
+            type: string
+          example:
+            - B2B
+            - Крупный клиент
+        contacts:
+          type: array
+          description: |
+            Другие сотрудники юридического лица. Для клиента типа PERSON
+            возвращается пустой массив. Представитель из clients здесь не дублируется.
+          items:
+            $ref: "#/components/schemas/ClientContact"
+
+    ClientContact:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - first_name
+        - last_name
+        - phone
+        - email
+        - position
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор контактного лица
+          example: "00000000-0000-4000-8000-000000000001"
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Имя сотрудника компании
+          example: Мария
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: Фамилия сотрудника компании
+          example: Соколова
+        phone:
+          type: string
+          nullable: true
+          maxLength: 50
+          description: Телефон сотрудника компании
+          example: "+79990002233"
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 255
+          description: Электронная почта сотрудника компании
+          example: maria@romashka.ru
+        position:
+          type: string
+          nullable: true
+          maxLength: 150
+          description: Должность сотрудника компании
+          example: Бухгалтер
+
+    ClientLastComment:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required:
+        - text
+        - author_name
+        - created_at
+      properties:
+        text:
+          type: string
+          description: Текст последнего комментария
+          example: Отправили коммерческое предложение
+        author_name:
+          type: string
+          description: Полное имя автора комментария
+          example: Булат Ахметов
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время создания комментария
+          example: "2026-09-18T08:15:00Z"
 
     ErrorResponse:
       type: object
