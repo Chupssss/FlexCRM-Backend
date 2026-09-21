@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	database "FlexCRM-Backend/db"
 	"FlexCRM-Backend/internal/config"
 	"FlexCRM-Backend/internal/routers"
 
@@ -34,7 +35,13 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_ = ctx // Заглушка
+	db, err := database.NewPostgresPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal("database connection failed: ", err)
+	}
+	defer db.Close()
+
+	log.Println("database connected")
 
 	routers.SetupRouter(mux)
 
