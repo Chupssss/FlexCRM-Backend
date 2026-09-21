@@ -1,19 +1,33 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 type Config struct {
-	BaseURL string
+	BaseURL     string
+	DatabaseURL string
 }
 
-func Load() Config {
-	baseURL := os.Getenv("BASE_URL")
-
-	if baseURL == "" {
-		baseURL = ":8080"
+func Load() *Config {
+	cfg := &Config{
+		BaseURL:     getEnv("BASE_URL", ":8080"),
+		DatabaseURL: getEnv("DATABASE_URL", ""),
 	}
 
-	return Config{
-		BaseURL: baseURL,
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
 	}
+
+	return cfg
+}
+
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	return value
 }
