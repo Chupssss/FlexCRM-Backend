@@ -1,24 +1,46 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 )
 
 type Config struct {
-	BaseURL     string
+	BaseURL string
+
+	DBHost     string
+	DBPort     string
+	DBUser     string
+	DBPassword string
+	DBName     string
+
 	DatabaseURL string
 }
 
 func Load() *Config {
 	cfg := &Config{
-		BaseURL:     getEnv("BASE_URL", ":8080"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
+		BaseURL: getEnv("BASE_URL", ":8080"),
+
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnv("DB_PORT", "5432"),
+		DBUser:     getEnv("DB_USER", "postgres"),
+		DBPassword: getEnv("DB_PASSWORD", ""),
+		DBName:     getEnv("DB_NAME", "flexcrm"),
 	}
 
-	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+	if cfg.DBPassword == "" {
+		log.Fatal("DB_PASSWORD is required")
 	}
+
+	cfg.DatabaseURL = fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBName,
+	)
 
 	return cfg
 }
