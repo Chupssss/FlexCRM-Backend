@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS deals(
+id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+company_id            UUID  NOT NULL,
+client_id             UUID NOT NULL,
+pipeline_id           UUID  NOT NULL,
+stage_id              UUID  NOT NULL,
+responsible_user_id   UUID  NULL,
+created_by            UUID  NOT NULL,
+title                 VARCHAR(255) NOT NULL,
+description           TEXT NULL,
+amount                NUMERIC(15,2) NULL,
+currency              CHAR(3) NOT NULL DEFAULT 'RUB',
+expected_close_at     TIMESTAMPTZ NULL,
+created_at            TIMESTAMPTZ NOT NULL,
+updated_at            TIMESTAMPTZ NOT NULL,
+FOREIGN KEY (company_id) REFERENCES companies(id),
+FOREIGN KEY (client_id) REFERENCES clients(id),
+FOREIGN KEY (pipeline_id) REFERENCES pipelines(id),
+FOREIGN KEY (stage_id) REFERENCES pipeline_stages(id),
+FOREIGN KEY (responsible_user_id) REFERENCES users(id),
+FOREIGN KEY (created_by) REFERENCES users(id)
+);
