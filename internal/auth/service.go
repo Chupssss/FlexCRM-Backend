@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"log"
 	"time"
 
@@ -48,6 +50,12 @@ func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthRe
 		return nil, err
 	}
 	// создание refresh токена
-
+	refresh_token := rand.Text()
+	refresh_expires := time.Now().AddDate(0, 0, 30)
+	hash_refresh_token := sha256.Sum256([]byte(refresh_token))
+	err = serv.repo.CreateRefreshToken(ctx, id, hash_refresh_token[:], refresh_expires)
+	if err != nil {
+		return nil, err
+	}
 	// создание accessтокена
 }

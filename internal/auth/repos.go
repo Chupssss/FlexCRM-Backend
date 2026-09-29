@@ -65,3 +65,17 @@ func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserPar
 	}
 	return user_id, nil
 }
+
+// Функция создания refresh-token
+func (repo *RepoConn) CreateRefreshToken(ctx context.Context, id uuid.UUID, hash_refresh_token []byte, refresh_expires_time time.Time) error {
+	_, err := repo.conn.Exec(ctx, "INSERT INTO refresh_tokens (user_id, token_hash, expires_at, created_at) VALUES ($1, $2, $3, $4)", id, hash_refresh_token, refresh_expires_time, time.Now())
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
+	return nil
+}
