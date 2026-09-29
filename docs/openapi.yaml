@@ -66,14 +66,32 @@ paths:
                   id: "00000000-0000-4000-8000-000000000101"
                   name: ООО Ромашка
         "400":
-          description: Некорректные регистрационные данные
+          description: Некорректный запрос или ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidBody:
+                  summary: Некорректное тело запроса
+                  value:
+                    code: INVALID_REQUEST_BODY
+                    message: Некорректное тело запроса
+
+                validationError:
+                  summary: Ошибка валидации регистрационных данных
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Проверьте название компании и данные администратора
+        "405":
+          description: Неверный метод запроса
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
-                code: INVALID_REGISTRATION_DATA
-                message: Проверьте название компании и данные администратора
+                code: "METHOD_NOT_ALLOWED"
+                message: Неверный метод запроса
         "409":
           description: Пользователь с таким email уже существует
           content:

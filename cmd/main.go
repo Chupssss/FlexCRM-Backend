@@ -7,6 +7,7 @@ import (
 	"time"
 
 	database "FlexCRM-Backend/db"
+	"FlexCRM-Backend/internal/auth"
 	"FlexCRM-Backend/internal/config"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/routers"
@@ -44,14 +45,18 @@ func main() {
 	log.Println("database connected")
 
 	// Инициализация health сервиса
-	conn := health.SaveRepoConn(db_connect)           //Сохранение подключения к БД в структуре
-	healthservice := health.NewService(conn)          // Инициализация mainservice
+	connHealth := health.SaveRepoConn(db_connect)     //Сохранение подключения к БД в структуре
+	healthservice := health.NewService(connHealth)    // Инициализация mainservice
 	healthhandler := health.NewHandler(healthservice) // Создание health хэндлера
 
 	// Инициализация auths сервиса
+	connAuth := auth.SaveRepoConn(db_connect)
+	authservice := auth.NewService(connAuth)
+	authhandler := auth.NewHandler(authservice)
 
 	routers.SetupRouter(mux, routers.Dependencies{
 		HealthHandler: healthhandler,
+		AuthHandler:   authhandler,
 	}) // Инициализация эндпоинтов
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
