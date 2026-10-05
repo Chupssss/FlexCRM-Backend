@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"FlexCRM-Backend/internal/token"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -12,13 +13,15 @@ import (
 
 // Структура сервиса содержащая структуру с подключением к бд
 type Service struct {
-	repo *RepoConn
+	repo         *RepoConn
+	tokenManager *token.TokenManager
 }
 
 // Функция создания структуры сервиса с сохранением подключения к бд
-func NewService(repo *RepoConn) *Service {
+func NewService(repo *RepoConn, tokenManager *token.TokenManager) *Service {
 	return &Service{
-		repo: repo,
+		repo:         repo,
+		tokenManager: tokenManager,
 	}
 }
 
@@ -57,5 +60,17 @@ func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthRe
 	if err != nil {
 		return nil, err
 	}
-	// создание accessтокена
+	// создание access-токена
+	access_expires := time.Now().Add(15 * time.Minute)
+	access_token, err := serv.tokenManager.CreateToken(id, access_expires) //создание access токена длительностью 15 минут
+	if err != nil {
+		return nil, err
+	}
+	res := AuthResult{
+		AccessToken:      access_token,
+		RefreshToken:     refresh_token,
+		AccessExpiresAt:  access_expires,
+		RefreshExpiresAt: refresh_expires,
+	}
+	return &res, nil
 }

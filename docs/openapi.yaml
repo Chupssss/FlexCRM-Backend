@@ -1,30 +1,46 @@
 openapi: 3.0.3
-
 info:
   title: FlexCRM API
   version: 1.0.0
   description: REST API системы FlexCRM
-
 paths:
   /api/register/:
     post:
       tags:
-        - Auth
+      - Auth
       summary: Зарегистрировать компанию и администратора
-      description: |
+      description: '
+
         В одной транзакции создаёт новую компанию и её первого пользователя
+
+
         с ролью `ADMIN`.
 
+
         Поля `role` и `is_active` frontend не передаёт: backend автоматически
+
+
         устанавливает `role = ADMIN` и `is_active = true`.
 
+
         Сначала backend создаёт компанию, затем создаёт администратора с
+
+
         `company_id` созданной компании. Если один из шагов завершается ошибкой,
+
+
         вся транзакция откатывается.
+
+
         Description для компании заполняется отдельно.
 
+
         Access- и refresh-токены возвращаются только в HttpOnly cookies и не
+
+
         включаются в JSON-ответ.
+
+        '
       operationId: register
       security: []
       requestBody:
@@ -32,116 +48,227 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/RegisterRequest'
             example:
               company_name: ООО Ромашка
-              email: admin@flexcrm.ru
+              email: admin\@flexcrm.ru
               password: StrongPassword123!
               first_name: Булат
               last_name: Ахметов
       responses:
-        "201":
+        '201':
           description: Компания и администратор успешно зарегистрированы
           headers:
             Set-Cookie:
-              description: |
+              description: '
+
                 Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
+
+
                 В production cookies должны иметь атрибуты Secure и SameSite.
+
+                '
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RegisterResponse"
+                $ref: '#/components/schemas/RegisterResponse'
               example:
                 user:
-                  id: "00000000-0000-4000-8000-000000000001"
-                  email: admin@flexcrm.ru
                   first_name: Булат
                   last_name: Ахметов
                   role: ADMIN
-                  is_active: true
-                  company_id: "00000000-0000-4000-8000-000000000101"
                 company:
-                  id: "00000000-0000-4000-8000-000000000101"
                   name: ООО Ромашка
-        "400":
+        '400':
           description: Некорректный запрос или ошибка валидации
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               examples:
                 invalidBody:
                   summary: Некорректное тело запроса
                   value:
                     code: INVALID_REQUEST_BODY
                     message: Некорректное тело запроса
-
                 validationError:
                   summary: Ошибка валидации регистрационных данных
                   value:
                     code: VALIDATION_ERROR
                     message: Проверьте название компании и данные администратора
-        "405":
+        '405':
           description: Неверный метод запроса
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
-                code: "METHOD_NOT_ALLOWED"
+                code: METHOD_NOT_ALLOWED
                 message: Неверный метод запроса
-        "409":
+        '409':
           description: Пользователь с таким email уже существует
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: EMAIL_ALREADY_EXISTS
                 message: Пользователь с таким email уже зарегистрирован
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось зарегистрировать компанию и администратора
+  /api/register/manager/:
+    post:
+      tags:
+      - Auth
+      summary: Зарегистрировать менеджера
+      description: '
 
+        Создаёт нового пользователя с ролью `MANAGER` в компании текущего администратора.
+
+
+        Endpoint доступен только авторизованному пользователю с ролью `ADMIN`.
+
+
+        Поля `company_id`, `role` и `is_active` frontend не передаёт: backend определяет
+
+
+        компанию по текущему администратору и автоматически устанавливает
+
+
+        `role = MANAGER` и `is_active = true`.
+
+
+        После создания менеджера новые access- и refresh-токены не выдаются:
+
+
+        текущая сессия администратора остаётся без изменений.
+
+        '
+      operationId: registerManager
+      security:
+      - accessCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterManagerRequest'
+            example:
+              email: manager\@flexcrm.ru
+              password: StrongPassword123!
+              first_name: Анна
+              last_name: Смирнова
+      responses:
+        '201':
+          description: Менеджер успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticatedUser'
+              example:
+                id: 00000000-0000-4000-8000-000000000012
+                email: manager\@flexcrm.ru
+                first_name: Анна
+                last_name: Смирнова
+                role: MANAGER
+                is_active: true
+                company_id: 00000000-0000-4000-8000-000000000101
+        '400':
+          description: Некорректный запрос или ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: VALIDATION_ERROR
+                message: Проверьте данные менеджера
+        '401':
+          description: Пользователь не авторизован или access-токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        '403':
+          description: Текущий пользователь не является администратором
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: FORBIDDEN
+                message: Создавать менеджеров может только администратор
+        '409':
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: EMAIL_ALREADY_EXISTS
+                message: Пользователь с таким email уже зарегистрирован
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось зарегистрировать менеджера
   /api/register/worker/:
     post:
       tags:
-        - Auth
+      - Auth
       summary: Зарегистрировать сотрудника
-      description: |
+      description: '
+
         Зарезервированный endpoint для создания сотрудника администратором.
+
+
         Тело запроса и итоговый контракт будут описаны позднее.
+
+        '
       operationId: registerWorker
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       responses:
-        "501":
+        '501':
           description: Endpoint пока не реализован
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: NOT_IMPLEMENTED
                 message: Регистрация сотрудника пока не реализована
-
   /api/login/:
     post:
       tags:
-        - Auth
+      - Auth
       summary: Войти в систему
-      description: |
-        Авторизует администратора или сотрудника по email и паролю.
+      description: '
+
+        Авторизует пользователя с ролью `ADMIN`, `MANAGER` или `EMPLOYEE` по email и паролю.
+
+
         Access- и refresh-токены устанавливаются в HttpOnly cookies и не
+
+
         возвращаются в JSON.
+
+        '
       operationId: login
       security: []
       requestBody:
@@ -149,160 +276,174 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
             example:
-              email: user@flexcrm.ru
+              email: user\@flexcrm.ru
               password: StrongPassword123!
       responses:
-        "200":
+        '200':
           description: Авторизация выполнена успешно
           headers:
             Set-Cookie:
-              description: |
+              description: '
+
                 Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
+
+
                 В production cookies должны иметь атрибуты Secure и SameSite.
+
+                '
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: '#/components/schemas/AuthResponse'
               example:
                 user:
-                  id: "00000000-0000-4000-8000-000000000011"
-                  email: user@flexcrm.ru
                   first_name: Иван
                   last_name: Петров
                   role: EMPLOYEE
-                  is_active: true
-                  company_id: "00000000-0000-4000-8000-000000000101"
-        "400":
+        '400':
           description: Некорректное тело запроса
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_REQUEST_BODY
                 message: Некорректное тело запроса
-        "401":
+        '401':
           description: Неверный email или пароль
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_CREDENTIALS
                 message: Неверный email или пароль
-        "403":
+        '403':
           description: Пользователь деактивирован
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: USER_INACTIVE
                 message: Пользователь деактивирован
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось выполнить вход
-
   /api/refresh/:
     post:
       tags:
-        - Auth
+      - Auth
       summary: Обновить токены
-      description: |
+      description: '
+
         Проверяет refresh-токен из HttpOnly cookie. При успешной проверке
+
+
         выпускает новый access-токен и при необходимости ротирует refresh-токен.
+
+
         Тело запроса отсутствует.
+
+        '
       operationId: refreshTokens
       security:
-        - refreshCookieAuth: []
+      - refreshCookieAuth: []
       responses:
-        "204":
+        '204':
           description: Токены успешно обновлены
           headers:
             Set-Cookie:
               description: Устанавливает обновлённые HttpOnly auth cookies
               schema:
                 type: string
-        "401":
+        '401':
           description: Refresh-токен отсутствует, истёк или недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_REFRESH_TOKEN
                 message: Необходимо повторно войти в систему
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось обновить токены
-
   /api/logout/:
     post:
       tags:
-        - Auth
+      - Auth
       summary: Выйти из системы
       description: Удаляет access- и refresh-cookies. Тело запроса отсутствует.
       operationId: logout
       security: []
       responses:
-        "204":
+        '204':
           description: Выход выполнен, cookies удалены
           headers:
             Set-Cookie:
               description: Сбрасывает auth cookies через Max-Age=0
               schema:
                 type: string
-
   /api/general/:
     get:
       tags:
-        - General
+      - General
       summary: Получить данные для главной страницы
-      description: |
+      description: '
+
         Возвращает информацию о текущем пользователе, общую статистику
+
+
         компании, последние активности и ближайшие задачи.
 
+
         Параметр `limit` одновременно ограничивает количество элементов
+
+
         в массивах `activities` и `tasks`.
 
+
         Данные возвращаются только для компании текущего пользователя.
+
+        '
       operationId: getGeneralInformation
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       parameters:
-        - name: limit
-          in: query
-          required: false
-          description: Максимальное количество последних активностей и ближайших задач
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
-            default: 5
-          example: 5
+      - name: limit
+        in: query
+        required: false
+        description: Максимальное количество последних активностей и ближайших задач
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+        example: 5
       responses:
-        "200":
+        '200':
           description: Данные главной страницы успешно получены
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GeneralResponse"
+                $ref: '#/components/schemas/GeneralResponse'
               example:
                 first_name: Иван
                 last_name: Иванов
@@ -311,579 +452,641 @@ paths:
                 count_clients: 18
                 count_tasks: 7
                 activities:
-                  - actor_name: Булат Ахметов
-                    action: STAGE_CHANGED
-                    created_at: "2026-09-17T20:51:27Z"
-                  - actor_name: Система
-                    action: DEAL_CREATED
-                    created_at: "2026-09-17T19:40:10Z"
+                - actor_name: Булат Ахметов
+                  action: STAGE_CHANGED
+                  created_at: '2026-09-17T20:51:27Z'
+                - actor_name: Система
+                  action: DEAL_CREATED
+                  created_at: '2026-09-17T19:40:10Z'
                 tasks:
-                  - title: Позвонить клиенту
-                    due_at: "2026-09-18T12:00:00Z"
-                  - title: Подготовить договор
-                    due_at: "2026-09-19T09:30:00Z"
-        "400":
+                - title: Позвонить клиенту
+                  due_at: '2026-09-18T12:00:00Z'
+                - title: Подготовить договор
+                  due_at: '2026-09-19T09:30:00Z'
+        '400':
           description: Некорректные параметры запроса
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_QUERY_PARAMETER
                 message: Параметр limit должен быть числом от 1 до 50
-        "401":
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "403":
+        '403':
           description: Пользователь не имеет доступа к ресурсу
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: FORBIDDEN
                 message: Доступ запрещён
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить данные главной страницы
-
   /api/clients/:
     get:
       tags:
-        - Clients
+      - Clients
       summary: Получить список клиентов
-      description: |
+      description: '
+
         Возвращает список клиентов компании текущего пользователя.
 
+
         Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
+
+
         данные физического лица, а `company_name` может иметь значение `null`.
 
+
         Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
+
+
         данные представителя компании
 
+
         Поле `responsible_user_name` содержит полное имя ответственного сотрудника
+
+
         или `null`, если ответственный не назначен.
+
+        '
       operationId: getClients
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       responses:
-        "200":
+        '200':
           description: Список клиентов успешно получен
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ClientListItem"
+                  $ref: '#/components/schemas/ClientListItem'
               examples:
                 clientsFound:
                   summary: Клиенты найдены
                   value:
-                    - id: "585f996c-8106-442c-91c7-290d30b839ee"
-                      client_type: PERSON
-                      first_name: Алексей
-                      last_name: Сидоров
-                      company_name: null
-                      email: alexey@example.com
-                      phone: "+79995554433"
-                      responsible_user_name: Булат Ахметов
-                    - id: "78aa9c44-8a52-49e8-8281-751acef4032e"
-                      client_type: COMPANY
-                      first_name: Иван
-                      last_name: Петров
-                      company_name: ООО Ромашка
-                      email: ivan.petrov@romashka.ru
-                      phone: "+74951234567"
-                      responsible_user_name: Анна Смирнова
-                    - id: "b59cd2b3-9652-40a8-885f-b79664560727"
-                      client_type: COMPANY
-                      first_name: Максим
-                      last_name: Орлов
-                      company_name: ООО Вектор
-                      email: null
-                      phone: "+79990001122"
-                      responsible_user_name: null
-                emptyList:
-                  summary: Клиенты отсутствуют
-                  value: []
-        "401":
-          description: Пользователь не авторизован или токен недействителен
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                code: UNAUTHORIZED
-                message: Требуется авторизация
-        "500":
-          description: Внутренняя ошибка сервера
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                code: INTERNAL_ERROR
-                message: Не удалось получить список клиентов
-
-  /api/clients/{id}/:
-    get:
-      tags:
-        - Clients
-      summary: Получить профиль клиента
-      description: |
-        Возвращает подробную информацию о конкретном клиенте компании
-        текущего пользователя.
-
-        Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
-        данные физического лица, `company_name` имеет значение `null`,
-        а `contacts` является пустым массивом.
-
-        Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
-        данные представителя юридического лица, `company_name` — название
-        компании, а `contacts` — остальных сотрудников этой компании.
-
-        Представитель юридического лица в массиве `contacts` не дублируется.
-      operationId: getClientById
-      security:
-        - accessCookieAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: UUID клиента
-          schema:
-            type: string
-            format: uuid
-          example: "78aa9c44-8a52-49e8-8281-751acef4032e"
-      responses:
-        "200":
-          description: Профиль клиента успешно получен
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ClientDetail"
-              examples:
-                person:
-                  summary: Физическое лицо
-                  value:
-                    id: "585f996c-8106-442c-91c7-290d30b839ee"
+                  - id: 585f996c-8106-442c-91c7-290d30b839ee
                     client_type: PERSON
                     first_name: Алексей
                     last_name: Сидоров
                     company_name: null
-                    phone: "+79995554433"
-                    email: alexey@example.com
+                    email: alexey\@example.com
+                    phone: '+79995554433'
                     responsible_user_name: Булат Ахметов
-                    description: Заинтересован в услугах компании
-                    last_comment: null
-                    tags:
-                      - Потенциальный
-                    contacts: []
-                company:
-                  summary: Юридическое лицо
-                  value:
-                    id: "78aa9c44-8a52-49e8-8281-751acef4032e"
+                  - id: 78aa9c44-8a52-49e8-8281-751acef4032e
                     client_type: COMPANY
                     first_name: Иван
                     last_name: Петров
                     company_name: ООО Ромашка
-                    phone: "+74951234567"
-                    email: info@romashka.ru
+                    email: ivan.petrov\@romashka.ru
+                    phone: '+74951234567'
+                    responsible_user_name: Анна Смирнова
+                  - id: b59cd2b3-9652-40a8-885f-b79664560727
+                    client_type: COMPANY
+                    first_name: Максим
+                    last_name: Орлов
+                    company_name: ООО Вектор
+                    email: null
+                    phone: '+79990001122'
+                    responsible_user_name: null
+                emptyList:
+                  summary: Клиенты отсутствуют
+                  value: []
+        '401':
+          description: Пользователь не авторизован или токен недействителен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось получить список клиентов
+  /api/clients/{id}/:
+    get:
+      tags:
+      - Clients
+      summary: Получить профиль клиента
+      description: '
+
+        Возвращает подробную информацию о конкретном клиенте компании
+
+
+        текущего пользователя.
+
+
+        Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
+
+
+        данные физического лица, `company_name` имеет значение `null`,
+
+
+        а `contacts` является пустым массивом.
+
+
+        Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
+
+
+        данные представителя юридического лица, `company_name` — название
+
+
+        компании, а `contacts` — остальных сотрудников этой компании.
+
+
+        Представитель юридического лица в массиве `contacts` не дублируется.
+
+        '
+      operationId: getClientById
+      security:
+      - accessCookieAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: UUID клиента
+        schema:
+          type: string
+          format: uuid
+        example: 78aa9c44-8a52-49e8-8281-751acef4032e
+      responses:
+        '200':
+          description: Профиль клиента успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDetail'
+              examples:
+                person:
+                  summary: Физическое лицо
+                  value:
+                    id: 585f996c-8106-442c-91c7-290d30b839ee
+                    client_type: PERSON
+                    first_name: Алексей
+                    last_name: Сидоров
+                    company_name: null
+                    phone: '+79995554433'
+                    email: alexey\@example.com
+                    responsible_user_name: Булат Ахметов
+                    description: Заинтересован в услугах компании
+                    last_comment: null
+                    tags:
+                    - Потенциальный
+                    contacts: []
+                company:
+                  summary: Юридическое лицо
+                  value:
+                    id: 78aa9c44-8a52-49e8-8281-751acef4032e
+                    client_type: COMPANY
+                    first_name: Иван
+                    last_name: Петров
+                    company_name: ООО Ромашка
+                    phone: '+74951234567'
+                    email: info\@romashka.ru
                     responsible_user_name: Анна Смирнова
                     description: Компания занимается поставкой оборудования
                     last_comment:
                       text: Отправили коммерческое предложение
                       author_name: Булат Ахметов
-                      created_at: "2026-09-18T08:15:00Z"
+                      created_at: '2026-09-18T08:15:00Z'
                     tags:
-                      - B2B
-                      - Крупный клиент
+                    - B2B
+                    - Крупный клиент
                     contacts:
-                      - id: "00000000-0000-4000-8000-000000000001"
-                        first_name: Мария
-                        last_name: Соколова
-                        phone: "+79990002233"
-                        email: maria@romashka.ru
-                        position: Бухгалтер
-                      - id: "00000000-0000-4000-8000-000000000002"
-                        first_name: Алексей
-                        last_name: Орлов
-                        phone: "+79990003344"
-                        email: alexey@romashka.ru
-                        position: Менеджер по закупкам
-        "400":
+                    - id: 00000000-0000-4000-8000-000000000001
+                      first_name: Мария
+                      last_name: Соколова
+                      phone: '+79990002233'
+                      email: maria\@romashka.ru
+                      position: Бухгалтер
+                    - id: 00000000-0000-4000-8000-000000000002
+                      first_name: Алексей
+                      last_name: Орлов
+                      phone: '+79990003344'
+                      email: alexey\@romashka.ru
+                      position: Менеджер по закупкам
+        '400':
           description: Идентификатор клиента имеет некорректный формат
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_CLIENT_ID
                 message: Идентификатор клиента должен быть UUID
-        "401":
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "404":
+        '404':
           description: Клиент не найден в компании текущего пользователя
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: CLIENT_NOT_FOUND
                 message: Клиент не найден
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить профиль клиента
-
   /api/users/:
     get:
       tags:
-        - Users
+      - Users
       summary: Получить сотрудников для выбора ответственного
-      description: |
+      description: '
+
         Возвращает активных сотрудников компании текущего пользователя.
+
+
         Используется для заполнения выпадающего списка ответственных при создании сделки.
+
+        '
       operationId: getUsers
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       responses:
-        "200":
+        '200':
           description: Список сотрудников успешно получен
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/UserOption"
+                  $ref: '#/components/schemas/UserOption'
               example:
-                - id: "00000000-0000-4000-8000-000000000011"
-                  first_name: Булат
-                  last_name: Ахметов
-                - id: "00000000-0000-4000-8000-000000000012"
-                  first_name: Анна
-                  last_name: Смирнова
-        "401":
+              - id: 00000000-0000-4000-8000-000000000011
+                first_name: Булат
+                last_name: Ахметов
+              - id: 00000000-0000-4000-8000-000000000012
+                first_name: Анна
+                last_name: Смирнова
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить список сотрудников
-
   /api/pipelines/:
     get:
       tags:
-        - Pipelines
+      - Pipelines
       summary: Получить воронки для создания сделки
-      description: |
+      description: '
+
         Возвращает активные воронки компании текущего пользователя.
+
+
         Компания определяется backend по авторизованному пользователю.
+
+        '
       operationId: getPipelines
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       responses:
-        "200":
+        '200':
           description: Список воронок успешно получен
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PipelineOption"
+                  $ref: '#/components/schemas/PipelineOption'
               example:
-                - id: "00000000-0000-4000-8000-000000000021"
-                  name: Продажи
-                - id: "00000000-0000-4000-8000-000000000022"
-                  name: Повторные продажи
-        "401":
+              - id: 00000000-0000-4000-8000-000000000021
+                name: Продажи
+              - id: 00000000-0000-4000-8000-000000000022
+                name: Повторные продажи
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить список воронок
-
   /api/pipelines/{pipeline_id}/stages/:
     get:
       tags:
-        - Pipelines
+      - Pipelines
       summary: Получить стадии выбранной воронки
-      description: |
+      description: '
+
         Возвращает все стадии выбранной воронки, отсортированные по `position`.
+
+
         Воронка должна принадлежать компании текущего пользователя.
+
+        '
       operationId: getPipelineStages
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       parameters:
-        - name: pipeline_id
-          in: path
-          required: true
-          description: UUID воронки
-          schema:
-            type: string
-            format: uuid
-          example: "00000000-0000-4000-8000-000000000021"
+      - name: pipeline_id
+        in: path
+        required: true
+        description: UUID воронки
+        schema:
+          type: string
+          format: uuid
+        example: 00000000-0000-4000-8000-000000000021
       responses:
-        "200":
+        '200':
           description: Список стадий успешно получен
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/StageOption"
+                  $ref: '#/components/schemas/StageOption'
               example:
-                - id: "00000000-0000-4000-8000-000000000031"
-                  name: Новый
-                  position: 1
-                - id: "00000000-0000-4000-8000-000000000032"
-                  name: Переговоры
-                  position: 2
-                - id: "00000000-0000-4000-8000-000000000033"
-                  name: Договор
-                  position: 3
-        "400":
+              - id: 00000000-0000-4000-8000-000000000031
+                name: Новый
+                position: 1
+              - id: 00000000-0000-4000-8000-000000000032
+                name: Переговоры
+                position: 2
+              - id: 00000000-0000-4000-8000-000000000033
+                name: Договор
+                position: 3
+        '400':
           description: Идентификатор воронки имеет некорректный формат
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INVALID_PIPELINE_ID
                 message: Идентификатор воронки должен быть UUID
-        "401":
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "404":
+        '404':
           description: Воронка не найдена в компании текущего пользователя
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: PIPELINE_NOT_FOUND
                 message: Воронка не найдена
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить стадии воронки
-
   /api/deals/:
     get:
       tags:
-        - Deals
+      - Deals
       summary: Получить Kanban-доску сделок
-      description: |
+      description: '
+
         Возвращает все активные воронки компании текущего пользователя.
+
+
         Для каждой воронки возвращаются её стадии, а для каждой стадии — сделки.
 
+
         Стадии сортируются по полю `position`. Пустые стадии также возвращаются
+
+
         с пустым массивом `deals`.
 
+
         В каждой сделке возвращаются данные клиента. Для клиента типа `PERSON`
+
+
         поле `company_name` имеет значение `null`, и frontend использует
+
+
         `first_name` и `last_name`. Для клиента типа `COMPANY` frontend может
+
+
         использовать `company_name`.
+
+        '
       operationId: getDealsBoard
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       responses:
-        "200":
+        '200':
           description: Воронки со стадиями и сделками успешно получены
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DealsBoardResponse"
+                $ref: '#/components/schemas/DealsBoardResponse'
               example:
                 pipelines:
-                  - id: "00000000-0000-4000-8000-000000000001"
-                    name: Продажи
-                    deal_count: 2
-                    stages:
-                      - id: "00000000-0000-4000-8000-000000000011"
-                        name: Новый
-                        position: 1
-                        deal_count: 1
-                        deals:
-                          - id: "00000000-0000-4000-8000-000000000101"
-                            title: Разработка сайта
-                            description: Создание корпоративного сайта
-                            amount: 150000
-                            currency: RUB
-                            expected_close_at: "2026-10-01T12:00:00Z"
-                            responsible_user_name: Булат Ахметов
-                            client:
-                              id: "00000000-0000-4000-8000-000000000201"
-                              client_type: PERSON
-                              first_name: Иван
-                              last_name: Петров
-                              company_name: null
-                      - id: "00000000-0000-4000-8000-000000000012"
-                        name: Переговоры
-                        position: 2
-                        deal_count: 1
-                        deals:
-                          - id: "00000000-0000-4000-8000-000000000102"
-                            title: Поставка оборудования
-                            description: null
-                            amount: 340000
-                            currency: RUB
-                            expected_close_at: null
-                            responsible_user_name: Анна Смирнова
-                            client:
-                              id: "00000000-0000-4000-8000-000000000202"
-                              client_type: COMPANY
-                              first_name: Алексей
-                              last_name: Сидоров
-                              company_name: ООО Ромашка
-                      - id: "00000000-0000-4000-8000-000000000013"
-                        name: Договор
-                        position: 3
-                        deal_count: 0
-                        deals: []
-                  - id: "00000000-0000-4000-8000-000000000002"
-                    name: Повторные продажи
+                - id: 00000000-0000-4000-8000-000000000001
+                  name: Продажи
+                  deal_count: 2
+                  stages:
+                  - id: 00000000-0000-4000-8000-000000000011
+                    name: Новый
+                    position: 1
+                    deal_count: 1
+                    deals:
+                    - id: 00000000-0000-4000-8000-000000000101
+                      title: Разработка сайта
+                      description: Создание корпоративного сайта
+                      amount: 150000
+                      currency: RUB
+                      expected_close_at: '2026-10-01T12:00:00Z'
+                      responsible_user_name: Булат Ахметов
+                      client:
+                        id: 00000000-0000-4000-8000-000000000201
+                        client_type: PERSON
+                        first_name: Иван
+                        last_name: Петров
+                        company_name: null
+                  - id: 00000000-0000-4000-8000-000000000012
+                    name: Переговоры
+                    position: 2
+                    deal_count: 1
+                    deals:
+                    - id: 00000000-0000-4000-8000-000000000102
+                      title: Поставка оборудования
+                      description: null
+                      amount: 340000
+                      currency: RUB
+                      expected_close_at: null
+                      responsible_user_name: Анна Смирнова
+                      client:
+                        id: 00000000-0000-4000-8000-000000000202
+                        client_type: COMPANY
+                        first_name: Алексей
+                        last_name: Сидоров
+                        company_name: ООО Ромашка
+                  - id: 00000000-0000-4000-8000-000000000013
+                    name: Договор
+                    position: 3
                     deal_count: 0
-                    stages:
-                      - id: "00000000-0000-4000-8000-000000000021"
-                        name: Новая заявка
-                        position: 1
-                        deal_count: 0
-                        deals: []
-        "401":
+                    deals: []
+                - id: 00000000-0000-4000-8000-000000000002
+                  name: Повторные продажи
+                  deal_count: 0
+                  stages:
+                  - id: 00000000-0000-4000-8000-000000000021
+                    name: Новая заявка
+                    position: 1
+                    deal_count: 0
+                    deals: []
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось получить Kanban-доску сделок
-
     post:
       tags:
-        - Deals
+      - Deals
       summary: Создать сделку
-      description: |
+      description: '
+
         Создаёт новую сделку в выбранной воронке и на выбранной стадии.
 
+
         `company_id` и `created_by` не передаются frontend: backend определяет
+
+
         их по текущему авторизованному пользователю.
 
+
         Backend проверяет, что клиент, ответственный сотрудник и воронка
+
+
         принадлежат компании текущего пользователя, а стадия принадлежит
+
+
         выбранной воронке.
+
+        '
       operationId: createDeal
       security:
-        - accessCookieAuth: []
+      - accessCookieAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateDealRequest"
+              $ref: '#/components/schemas/CreateDealRequest'
             example:
               title: Поставка оборудования
-              client_id: "00000000-0000-4000-8000-000000000002"
-              responsible_user_id: "00000000-0000-4000-8000-000000000011"
-              pipeline_id: "00000000-0000-4000-8000-000000000021"
-              stage_id: "00000000-0000-4000-8000-000000000032"
+              client_id: 00000000-0000-4000-8000-000000000002
+              responsible_user_id: 00000000-0000-4000-8000-000000000011
+              pipeline_id: 00000000-0000-4000-8000-000000000021
+              stage_id: 00000000-0000-4000-8000-000000000032
               amount: 100000
               currency: RUB
               description: null
               expected_close_at: null
       responses:
-        "201":
+        '201':
           description: Сделка успешно создана
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateDealResponse"
+                $ref: '#/components/schemas/CreateDealResponse'
               example:
-                id: "00000000-0000-4000-8000-000000000101"
+                id: 00000000-0000-4000-8000-000000000101
                 title: Поставка оборудования
-                client_id: "00000000-0000-4000-8000-000000000002"
-                responsible_user_id: "00000000-0000-4000-8000-000000000011"
-                pipeline_id: "00000000-0000-4000-8000-000000000021"
-                stage_id: "00000000-0000-4000-8000-000000000032"
+                client_id: 00000000-0000-4000-8000-000000000002
+                responsible_user_id: 00000000-0000-4000-8000-000000000011
+                pipeline_id: 00000000-0000-4000-8000-000000000021
+                stage_id: 00000000-0000-4000-8000-000000000032
                 amount: 100000
                 currency: RUB
                 description: null
                 expected_close_at: null
-                created_at: "2026-09-18T12:30:00Z"
-        "400":
+                created_at: '2026-09-18T12:30:00Z'
+        '400':
           description: Некорректное тело запроса или ошибка валидации
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               examples:
                 invalidBody:
                   summary: Некорректный JSON
@@ -895,34 +1098,33 @@ paths:
                   value:
                     code: INVALID_AMOUNT
                     message: Сумма сделки не может быть отрицательной
-        "401":
+        '401':
           description: Пользователь не авторизован или токен недействителен
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "404":
+        '404':
           description: Клиент, сотрудник, воронка или стадия не найдены
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: RELATED_ENTITY_NOT_FOUND
                 message: Один из выбранных объектов не найден
-        "500":
+        '500':
           description: Внутренняя ошибка сервера
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось создать сделку
-
 components:
   securitySchemes:
     accessCookieAuth:
@@ -930,23 +1132,21 @@ components:
       in: cookie
       name: access_token
       description: JWT access-токен в HttpOnly cookie
-
     refreshCookieAuth:
       type: apiKey
       in: cookie
       name: refresh_token
       description: JWT refresh-токен в HttpOnly cookie
-
   schemas:
     RegisterRequest:
       type: object
       additionalProperties: false
       required:
-        - company_name
-        - email
-        - password
-        - first_name
-        - last_name
+      - company_name
+      - email
+      - password
+      - first_name
+      - last_name
       properties:
         company_name:
           type: string
@@ -959,7 +1159,7 @@ components:
           format: email
           maxLength: 255
           description: Email администратора новой компании
-          example: admin@flexcrm.ru
+          example: admin\@flexcrm.ru
         password:
           type: string
           format: password
@@ -980,20 +1180,54 @@ components:
           maxLength: 100
           description: Фамилия администратора
           example: Ахметов
-
+    RegisterManagerRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - password
+      - first_name
+      - last_name
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email создаваемого менеджера
+          example: manager\@flexcrm.ru
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          writeOnly: true
+          description: Пароль менеджера; сохраняется только в виде хеша
+          example: StrongPassword123!
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Имя менеджера
+          example: Анна
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Фамилия менеджера
+          example: Смирнова
     LoginRequest:
       type: object
       additionalProperties: false
       required:
-        - email
-        - password
+      - email
+      - password
       properties:
         email:
           type: string
           format: email
           maxLength: 255
           description: Email пользователя
-          example: user@flexcrm.ru
+          example: user\@flexcrm.ru
         password:
           type: string
           format: password
@@ -1002,68 +1236,75 @@ components:
           writeOnly: true
           description: Пароль пользователя
           example: StrongPassword123!
-
     RegisterResponse:
       type: object
+      description: Результат регистрации новой компании и её администратора.
       additionalProperties: false
       required:
-        - user
-        - company
+      - user
+      - company
       properties:
         user:
-          $ref: "#/components/schemas/AuthenticatedUser"
+          $ref: '#/components/schemas/FrontendUser'
         company:
-          $ref: "#/components/schemas/RegisteredCompany"
-
+          type: object
+          additionalProperties: false
+          required:
+          - name
+          properties:
+            name:
+              type: string
+              maxLength: 255
+              description: Название созданной компании
+              example: ООО Ромашка
     RegisteredCompany:
       type: object
       additionalProperties: false
       required:
-        - id
-        - name
+      - id
+      - name
       properties:
         id:
           type: string
           format: uuid
           description: UUID созданной компании
-          example: "00000000-0000-4000-8000-000000000101"
+          example: 00000000-0000-4000-8000-000000000101
         name:
           type: string
           maxLength: 255
           description: Название созданной компании
           example: ООО Ромашка
-
     AuthResponse:
       type: object
+      description: Результат успешной авторизации. Токены устанавливаются в HttpOnly cookies.
       additionalProperties: false
       required:
-        - user
+      - user
       properties:
         user:
-          $ref: "#/components/schemas/AuthenticatedUser"
-
+          $ref: '#/components/schemas/FrontendUser'
     AuthenticatedUser:
       type: object
       additionalProperties: false
       required:
-        - id
-        - email
-        - first_name
-        - last_name
-        - role
-        - is_active
-        - company_id
+      - id
+      - email
+      - first_name
+      - last_name
+      - role
+      - is_active
+      - company_id
       properties:
         id:
           type: string
           format: uuid
           description: UUID пользователя
-          example: "00000000-0000-4000-8000-000000000011"
+          example: 00000000-0000-4000-8000-000000000011
         email:
           type: string
           format: email
           description: Email пользователя
-          example: user@flexcrm.ru
+          example: user\@flexcrm.ru
         first_name:
           type: string
           maxLength: 100
@@ -1078,9 +1319,9 @@ components:
           type: string
           description: Роль пользователя; при самостоятельной регистрации всегда ADMIN
           enum:
-            - ADMIN
-            - MANAGER
-            - EMPLOYEE
+          - ADMIN
+          - MANAGER
+          - EMPLOYEE
           example: ADMIN
         is_active:
           type: boolean
@@ -1090,19 +1331,18 @@ components:
           type: string
           format: uuid
           description: UUID компании пользователя
-          example: "00000000-0000-4000-8000-000000000101"
-
+          example: 00000000-0000-4000-8000-000000000101
     GeneralResponse:
       type: object
       required:
-        - first_name
-        - last_name
-        - role
-        - count_of_all_deals
-        - count_clients
-        - count_tasks
-        - activities
-        - tasks
+      - first_name
+      - last_name
+      - role
+      - count_of_all_deals
+      - count_clients
+      - count_tasks
+      - activities
+      - tasks
       properties:
         first_name:
           type: string
@@ -1138,19 +1378,18 @@ components:
           type: array
           description: Последние активности компании, отсортированные от новых к старым
           items:
-            $ref: "#/components/schemas/GeneralActivity"
+            $ref: '#/components/schemas/GeneralActivity'
         tasks:
           type: array
           description: Ближайшие задачи, отсортированные по сроку выполнения
           items:
-            $ref: "#/components/schemas/GeneralTask"
-
+            $ref: '#/components/schemas/GeneralTask'
     GeneralActivity:
       type: object
       required:
-        - actor_name
-        - action
-        - created_at
+      - actor_name
+      - action
+      - created_at
       properties:
         actor_name:
           type: string
@@ -1164,13 +1403,12 @@ components:
           type: string
           format: date-time
           description: Дата и время совершения действия
-          example: "2026-09-17T20:51:27Z"
-
+          example: '2026-09-17T20:51:27Z'
     GeneralTask:
       type: object
       required:
-        - title
-        - due_at
+      - title
+      - due_at
       properties:
         title:
           type: string
@@ -1181,32 +1419,31 @@ components:
           format: date-time
           nullable: true
           description: Срок выполнения задачи или null, если срок не установлен
-          example: "2026-09-18T12:00:00Z"
-
+          example: '2026-09-18T12:00:00Z'
     ClientListItem:
       type: object
       additionalProperties: false
       required:
-        - id
-        - client_type
-        - first_name
-        - last_name
-        - company_name
-        - email
-        - phone
-        - responsible_user_name
+      - id
+      - client_type
+      - first_name
+      - last_name
+      - company_name
+      - email
+      - phone
+      - responsible_user_name
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор клиента
-          example: "585f996c-8106-442c-91c7-290d30b839ee"
+          example: 585f996c-8106-442c-91c7-290d30b839ee
         client_type:
           type: string
           description: Тип клиента
           enum:
-            - PERSON
-            - COMPANY
+          - PERSON
+          - COMPANY
           example: COMPANY
         first_name:
           type: string
@@ -1232,47 +1469,46 @@ components:
           nullable: true
           maxLength: 255
           description: Электронная почта клиента или представителя компании
-          example: ivan.petrov@romashka.ru
+          example: ivan.petrov\@romashka.ru
         phone:
           type: string
           nullable: true
           maxLength: 50
           description: Номер телефона клиента или представителя компании
-          example: "+79991234567"
+          example: '+79991234567'
         responsible_user_name:
           type: string
           nullable: true
           description: Полное имя ответственного сотрудника
           example: Булат Ахметов
-
     ClientDetail:
       type: object
       additionalProperties: false
       required:
-        - id
-        - client_type
-        - first_name
-        - last_name
-        - company_name
-        - phone
-        - email
-        - responsible_user_name
-        - description
-        - last_comment
-        - tags
-        - contacts
+      - id
+      - client_type
+      - first_name
+      - last_name
+      - company_name
+      - phone
+      - email
+      - responsible_user_name
+      - description
+      - last_comment
+      - tags
+      - contacts
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор клиента
-          example: "78aa9c44-8a52-49e8-8281-751acef4032e"
+          example: 78aa9c44-8a52-49e8-8281-751acef4032e
         client_type:
           type: string
           description: Тип клиента
           enum:
-            - PERSON
-            - COMPANY
+          - PERSON
+          - COMPANY
           example: COMPANY
         first_name:
           type: string
@@ -1297,14 +1533,14 @@ components:
           nullable: true
           maxLength: 50
           description: Телефон клиента или юридического лица
-          example: "+74951234567"
+          example: '+74951234567'
         email:
           type: string
           format: email
           nullable: true
           maxLength: 255
           description: Электронная почта клиента или юридического лица
-          example: info@romashka.ru
+          example: info\@romashka.ru
         responsible_user_name:
           type: string
           nullable: true
@@ -1316,39 +1552,43 @@ components:
           description: Дополнительное описание клиента
           example: Компания занимается поставкой оборудования
         last_comment:
-          $ref: "#/components/schemas/ClientLastComment"
+          $ref: '#/components/schemas/ClientLastComment'
         tags:
           type: array
           description: Теги клиента
           items:
             type: string
           example:
-            - B2B
-            - Крупный клиент
+          - B2B
+          - Крупный клиент
         contacts:
           type: array
-          description: |
-            Другие сотрудники юридического лица. Для клиента типа PERSON
-            возвращается пустой массив. Представитель из clients здесь не дублируется.
-          items:
-            $ref: "#/components/schemas/ClientContact"
+          description: '
 
+            Другие сотрудники юридического лица. Для клиента типа PERSON
+
+
+            возвращается пустой массив. Представитель из clients здесь не дублируется.
+
+            '
+          items:
+            $ref: '#/components/schemas/ClientContact'
     ClientContact:
       type: object
       additionalProperties: false
       required:
-        - id
-        - first_name
-        - last_name
-        - phone
-        - email
-        - position
+      - id
+      - first_name
+      - last_name
+      - phone
+      - email
+      - position
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор контактного лица
-          example: "00000000-0000-4000-8000-000000000001"
+          example: 00000000-0000-4000-8000-000000000001
         first_name:
           type: string
           minLength: 1
@@ -1366,29 +1606,28 @@ components:
           nullable: true
           maxLength: 50
           description: Телефон сотрудника компании
-          example: "+79990002233"
+          example: '+79990002233'
         email:
           type: string
           format: email
           nullable: true
           maxLength: 255
           description: Электронная почта сотрудника компании
-          example: maria@romashka.ru
+          example: maria\@romashka.ru
         position:
           type: string
           nullable: true
           maxLength: 150
           description: Должность сотрудника компании
           example: Бухгалтер
-
     ClientLastComment:
       type: object
       nullable: true
       additionalProperties: false
       required:
-        - text
-        - author_name
-        - created_at
+      - text
+      - author_name
+      - created_at
       properties:
         text:
           type: string
@@ -1402,21 +1641,20 @@ components:
           type: string
           format: date-time
           description: Дата и время создания комментария
-          example: "2026-09-18T08:15:00Z"
-
+          example: '2026-09-18T08:15:00Z'
     UserOption:
       type: object
       additionalProperties: false
       required:
-        - id
-        - first_name
-        - last_name
+      - id
+      - first_name
+      - last_name
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор сотрудника
-          example: "00000000-0000-4000-8000-000000000011"
+          example: 00000000-0000-4000-8000-000000000011
         first_name:
           type: string
           maxLength: 100
@@ -1427,38 +1665,36 @@ components:
           maxLength: 100
           description: Фамилия сотрудника
           example: Ахметов
-
     PipelineOption:
       type: object
       additionalProperties: false
       required:
-        - id
-        - name
+      - id
+      - name
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор воронки
-          example: "00000000-0000-4000-8000-000000000021"
+          example: 00000000-0000-4000-8000-000000000021
         name:
           type: string
           maxLength: 150
           description: Название воронки
           example: Продажи
-
     StageOption:
       type: object
       additionalProperties: false
       required:
-        - id
-        - name
-        - position
+      - id
+      - name
+      - position
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор стадии
-          example: "00000000-0000-4000-8000-000000000032"
+          example: 00000000-0000-4000-8000-000000000032
         name:
           type: string
           maxLength: 150
@@ -1469,18 +1705,17 @@ components:
           minimum: 1
           description: Позиция стадии внутри воронки
           example: 2
-
     CreateDealRequest:
       type: object
       additionalProperties: false
       required:
-        - title
-        - client_id
-        - responsible_user_id
-        - pipeline_id
-        - stage_id
-        - amount
-        - currency
+      - title
+      - client_id
+      - responsible_user_id
+      - pipeline_id
+      - stage_id
+      - amount
+      - currency
       properties:
         title:
           type: string
@@ -1492,22 +1727,22 @@ components:
           type: string
           format: uuid
           description: UUID выбранного клиента
-          example: "00000000-0000-4000-8000-000000000002"
+          example: 00000000-0000-4000-8000-000000000002
         responsible_user_id:
           type: string
           format: uuid
           description: UUID выбранного ответственного сотрудника
-          example: "00000000-0000-4000-8000-000000000011"
+          example: 00000000-0000-4000-8000-000000000011
         pipeline_id:
           type: string
           format: uuid
           description: UUID выбранной воронки
-          example: "00000000-0000-4000-8000-000000000021"
+          example: 00000000-0000-4000-8000-000000000021
         stage_id:
           type: string
           format: uuid
           description: UUID выбранной стадии
-          example: "00000000-0000-4000-8000-000000000032"
+          example: 00000000-0000-4000-8000-000000000032
         amount:
           type: number
           format: double
@@ -1532,28 +1767,27 @@ components:
           nullable: true
           description: Ожидаемая дата закрытия сделки
           example: null
-
     CreateDealResponse:
       type: object
       additionalProperties: false
       required:
-        - id
-        - title
-        - client_id
-        - responsible_user_id
-        - pipeline_id
-        - stage_id
-        - amount
-        - currency
-        - description
-        - expected_close_at
-        - created_at
+      - id
+      - title
+      - client_id
+      - responsible_user_id
+      - pipeline_id
+      - stage_id
+      - amount
+      - currency
+      - description
+      - expected_close_at
+      - created_at
       properties:
         id:
           type: string
           format: uuid
           description: UUID созданной сделки
-          example: "00000000-0000-4000-8000-000000000101"
+          example: 00000000-0000-4000-8000-000000000101
         title:
           type: string
           maxLength: 255
@@ -1563,22 +1797,22 @@ components:
           type: string
           format: uuid
           description: UUID клиента
-          example: "00000000-0000-4000-8000-000000000002"
+          example: 00000000-0000-4000-8000-000000000002
         responsible_user_id:
           type: string
           format: uuid
           description: UUID ответственного сотрудника
-          example: "00000000-0000-4000-8000-000000000011"
+          example: 00000000-0000-4000-8000-000000000011
         pipeline_id:
           type: string
           format: uuid
           description: UUID воронки
-          example: "00000000-0000-4000-8000-000000000021"
+          example: 00000000-0000-4000-8000-000000000021
         stage_id:
           type: string
           format: uuid
           description: UUID стадии
-          example: "00000000-0000-4000-8000-000000000032"
+          example: 00000000-0000-4000-8000-000000000032
         amount:
           type: number
           format: double
@@ -1606,34 +1840,32 @@ components:
           type: string
           format: date-time
           description: Дата и время создания сделки
-          example: "2026-09-18T12:30:00Z"
-
+          example: '2026-09-18T12:30:00Z'
     DealsBoardResponse:
       type: object
       additionalProperties: false
       required:
-        - pipelines
+      - pipelines
       properties:
         pipelines:
           type: array
           description: Воронки компании со стадиями и сделками
           items:
-            $ref: "#/components/schemas/DealsBoardPipeline"
-
+            $ref: '#/components/schemas/DealsBoardPipeline'
     DealsBoardPipeline:
       type: object
       additionalProperties: false
       required:
-        - id
-        - name
-        - deal_count
-        - stages
+      - id
+      - name
+      - deal_count
+      - stages
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор воронки
-          example: "00000000-0000-4000-8000-000000000001"
+          example: 00000000-0000-4000-8000-000000000001
         name:
           type: string
           maxLength: 150
@@ -1649,23 +1881,22 @@ components:
           type: array
           description: Стадии воронки, отсортированные по position
           items:
-            $ref: "#/components/schemas/DealsBoardStage"
-
+            $ref: '#/components/schemas/DealsBoardStage'
     DealsBoardStage:
       type: object
       additionalProperties: false
       required:
-        - id
-        - name
-        - position
-        - deal_count
-        - deals
+      - id
+      - name
+      - position
+      - deal_count
+      - deals
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор стадии
-          example: "00000000-0000-4000-8000-000000000011"
+          example: 00000000-0000-4000-8000-000000000011
         name:
           type: string
           maxLength: 150
@@ -1686,26 +1917,25 @@ components:
           type: array
           description: Сделки, находящиеся на стадии
           items:
-            $ref: "#/components/schemas/DealsBoardItem"
-
+            $ref: '#/components/schemas/DealsBoardItem'
     DealsBoardItem:
       type: object
       additionalProperties: false
       required:
-        - id
-        - title
-        - description
-        - amount
-        - currency
-        - expected_close_at
-        - responsible_user_name
-        - client
+      - id
+      - title
+      - description
+      - amount
+      - currency
+      - expected_close_at
+      - responsible_user_name
+      - client
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор сделки
-          example: "00000000-0000-4000-8000-000000000101"
+          example: 00000000-0000-4000-8000-000000000101
         title:
           type: string
           maxLength: 255
@@ -1734,36 +1964,35 @@ components:
           format: date-time
           nullable: true
           description: Ожидаемая дата закрытия сделки
-          example: "2026-10-01T12:00:00Z"
+          example: '2026-10-01T12:00:00Z'
         responsible_user_name:
           type: string
           nullable: true
           description: Полное имя ответственного сотрудника или null
           example: Булат Ахметов
         client:
-          $ref: "#/components/schemas/DealsBoardClient"
-
+          $ref: '#/components/schemas/DealsBoardClient'
     DealsBoardClient:
       type: object
       additionalProperties: false
       required:
-        - id
-        - client_type
-        - first_name
-        - last_name
-        - company_name
+      - id
+      - client_type
+      - first_name
+      - last_name
+      - company_name
       properties:
         id:
           type: string
           format: uuid
           description: Уникальный идентификатор клиента
-          example: "00000000-0000-4000-8000-000000000201"
+          example: 00000000-0000-4000-8000-000000000201
         client_type:
           type: string
           description: Тип клиента
           enum:
-            - PERSON
-            - COMPANY
+          - PERSON
+          - COMPANY
           example: COMPANY
         first_name:
           type: string
@@ -1783,13 +2012,12 @@ components:
           maxLength: 255
           description: Название компании; для клиента типа PERSON имеет значение null
           example: ООО Ромашка
-
     ErrorResponse:
       type: object
       additionalProperties: false
       required:
-        - code
-        - message
+      - code
+      - message
       properties:
         code:
           type: string
@@ -1799,3 +2027,29 @@ components:
           type: string
           description: Описание ошибки
           example: Не удалось выполнить запрос
+    FrontendUser:
+      type: object
+      additionalProperties: false
+      required:
+      - first_name
+      - last_name
+      - role
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+          description: Имя текущего пользователя
+          example: Иван
+        last_name:
+          type: string
+          maxLength: 100
+          description: Фамилия текущего пользователя
+          example: Петров
+        role:
+          type: string
+          description: Роль пользователя, используемая frontend для адаптации интерфейса
+          enum:
+          - ADMIN
+          - MANAGER
+          - EMPLOYEE
+          example: EMPLOYEE

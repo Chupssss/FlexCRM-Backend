@@ -71,4 +71,25 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			customerror.SendError(w, &apperr)
 		}
 	}
+	// Установка access token в Cookie. Потом заменить secure на true, после появления https
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access-token",
+		Value:    result.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  result.AccessExpiresAt,
+	})
+	// Установка refresh token в Cookie. Потом заменить Secure на true, после появления https
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh-token",
+		Value:    result.RefreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  result.RefreshExpiresAt,
+	})
+	w.WriteHeader(http.StatusCreated)
 }

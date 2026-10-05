@@ -26,7 +26,7 @@ func SaveRepoConn(conn *pgxpool.Pool) *RepoConn {
 type CreateUserParameters struct {
 	Company_name string
 	Email        string
-	PasswordHash string
+	PasswordHash []byte
 	First_name   string
 	Last_name    string
 	Role         string
