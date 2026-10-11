@@ -1,6 +1,7 @@
 package token
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -50,5 +51,19 @@ func (manager *TokenManager) CreateToken(user_id, company_id uuid.UUID, role str
 
 // Функция верификации jwt токена
 func (manager *TokenManager) VerifyToken(tokenStr string) (*CustomClaims, error) {
-
+	claims := &CustomClaims{}
+	token, err := jwt.NewParser().ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(manager.jwtSecret), nil
+	})
+	if err != nil {
+		log.Printf("%v", err)
+		return nil, err
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid error")
+	}
+	return claims, nil
 }
