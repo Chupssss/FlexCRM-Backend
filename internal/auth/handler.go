@@ -35,7 +35,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apperr := customerror.AppError{HTTPStatus: 405, Code: "METHOD_NOT_ALLOWED", Message: "Неверный метод запроса"}
 		customerror.SendError(w, &apperr)
-		log.Println("error: method not allowed")
+		log.Printf("error: method not allowed")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second) // контекст, если пользователь закроет соединение или мы будет действовать более 5 секунд
@@ -46,14 +46,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		apperr := customerror.AppError{HTTPStatus: 400, Code: "INVALID_REQUEST_BODY", Message: "Некорректное тело запроса"}
 		customerror.SendError(w, &apperr)
-		log.Println("%v", err)
+		log.Printf("%v", err)
 		return
 	}
 
 	if user.Company_name == "" || user.Email == "" || user.First_name == "" || user.Last_name == "" || user.Password == "" {
 		apperr := customerror.AppError{HTTPStatus: 400, Code: "VALIDATION_ERROR", Message: "Проверьте название компании и данные администратора"}
 		customerror.SendError(w, &apperr)
-		log.Println("error: invalid data")
+		log.Printf("error: invalid data")
 		return
 	}
 	result, err := h.service.Register(ctx, &user)
@@ -69,6 +69,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		default:
 			apperr := customerror.AppError{HTTPStatus: 500, Code: "INTERNAL_ERROR", Message: "Не удалось зарегистрировать компанию и администратора"}
 			customerror.SendError(w, &apperr)
+			return
 		}
 	}
 	// Установка access token в Cookie. Потом заменить secure на true, после появления https

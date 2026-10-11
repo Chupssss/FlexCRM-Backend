@@ -33,21 +33,22 @@ type AuthResult struct {
 	RefreshExpiresAt time.Time
 }
 
-// Функция регистрации пользователя и компании
+// Функция регистрации Админа и компании
 func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthResult, error) {
 	// создание юзера и компании
 	password_hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		log.Println("%v", err)
+		log.Printf("%v", err)
 		return nil, err
 	}
-	id, err := serv.repo.CreateUserCompany(ctx, &CreateUserParameters{
+	role := "ADMIN"
+	user_id, company_id, err := serv.repo.CreateUserCompany(ctx, &CreateUserParameters{
 		Company_name: user.Company_name,
 		Email:        user.Email,
 		PasswordHash: password_hash,
 		First_name:   user.First_name,
 		Last_name:    user.Last_name,
-		Role:         "ADMIN",
+		Role:         role,
 	})
 	if err != nil {
 		return nil, err
@@ -56,13 +57,13 @@ func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthRe
 	refresh_token := rand.Text()
 	refresh_expires := time.Now().AddDate(0, 0, 30)
 	hash_refresh_token := sha256.Sum256([]byte(refresh_token))
-	err = serv.repo.CreateRefreshToken(ctx, id, hash_refresh_token[:], refresh_expires)
+	err = serv.repo.CreateRefreshToken(ctx, user_id, hash_refresh_token[:], refresh_expires)
 	if err != nil {
 		return nil, err
 	}
 	// создание access-токена
 	access_expires := time.Now().Add(15 * time.Minute)
-	access_token, err := serv.tokenManager.CreateToken(id, access_expires) //создание access токена длительностью 15 минут
+	access_token, err := serv.tokenManager.CreateToken(user_id, company_id, role, access_expires) //создание access токена длительностью 15 минут
 	if err != nil {
 		return nil, err
 	}

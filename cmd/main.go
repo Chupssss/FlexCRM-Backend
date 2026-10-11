@@ -61,7 +61,7 @@ func main() {
 	routers.SetupRouter(mux, routers.Dependencies{
 		HealthHandler: healthhandler,
 		AuthHandler:   authhandler,
-		MiddleWareAuth: 
+		//MiddleWareAuth:
 	}) // Инициализация эндпоинтов
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

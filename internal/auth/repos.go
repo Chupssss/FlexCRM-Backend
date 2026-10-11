@@ -33,18 +33,18 @@ type CreateUserParameters struct {
 }
 
 // Функция создания пользователя и компании в БД
-func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserParameters) (uuid.UUID, error) {
+func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserParameters) (uuid.UUID, uuid.UUID, error) {
 	tx, err := repo.conn.Begin(ctx) // начало транзакции
 	if err != nil {
 		log.Printf("%v", err)
-		return uuid.Nil, err
+		return uuid.Nil, uuid.Nil, err
 	}
 	defer tx.Rollback(ctx)
 	var company_id uuid.UUID
 	err = tx.QueryRow(ctx, "INSERT INTO companies (name, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id", user.Company_name, time.Now(), time.Now()).Scan(&company_id)
 	if err != nil {
 		log.Printf("%v", err)
-		return uuid.Nil, err
+		return uuid.Nil, uuid.Nil, err
 	}
 	var user_id uuid.UUID
 	err = tx.QueryRow(ctx, "INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", company_id, user.Email, user.PasswordHash, user.First_name, user.Last_name, user.Role, time.Now(), time.Now()).Scan(&user_id)
@@ -52,18 +52,18 @@ func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserPar
 		var pgerr *pgconn.PgError
 		if errors.As(err, &pgerr) {
 			if pgerr.Code == "23505" {
-				return uuid.Nil, ErrEmailAlreadyExists
+				return uuid.Nil, uuid.Nil, ErrEmailAlreadyExists
 			}
 		}
 		log.Printf("%v", err)
-		return uuid.Nil, err
+		return uuid.Nil, uuid.Nil, err
 	}
 	err = tx.Commit(ctx) // заканчиваем транзакцию
 	if err != nil {
 		log.Printf("%v", err)
-		return uuid.Nil, err
+		return uuid.Nil, uuid.Nil, err
 	}
-	return user_id, nil
+	return user_id, company_id, nil
 }
 
 // Функция создания refresh-token
