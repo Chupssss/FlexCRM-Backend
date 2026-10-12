@@ -51,12 +51,12 @@ func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserPar
 	err = tx.QueryRow(ctx, "INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", company_id, user.Email, user.PasswordHash, user.First_name, user.Last_name, user.Role, time.Now(), time.Now()).Scan(&user_id)
 	if err != nil {
 		var pgerr *pgconn.PgError
+		log.Printf("%v", err)
 		if errors.As(err, &pgerr) {
 			if pgerr.Code == "23505" {
 				return uuid.Nil, uuid.Nil, ErrEmailAlreadyExists
 			}
 		}
-		log.Printf("%v", err)
 		return uuid.Nil, uuid.Nil, err
 	}
 	err = tx.Commit(ctx) // заканчиваем транзакцию

@@ -206,3 +206,51 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	h.setCookie(w, result)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Функция LogOut пользователя
+func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperr := customerror.AppError{HTTPStatus: 405, Code: "METHOD_NOT_ALLOWED", Message: "Неверный метод запроса"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: method not allowed")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second) // контекст, если пользователь закроет соединение или мы будет действовать более 5 секунд
+	defer cancel()
+
+	cookie, err := r.Cookie("refresh-token")
+	if err != nil {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "access-token",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+		})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	err = h.service.LogOut(ctx, cookie.Value)
+	if err != nil {
+		if !errors.Is(err, ErrRefreshTokenNotFound) {
+			apperr := customerror.AppError{HTTPStatus: 500, Code: "INTERNAL_ERROR", Message: "Не удалось удалить токены"}
+			customerror.SendError(w, &apperr)
+			return
+		}
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access-token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh-token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	w.WriteHeader(http.StatusNoContent)
+}

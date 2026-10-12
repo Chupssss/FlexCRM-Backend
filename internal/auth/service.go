@@ -133,3 +133,13 @@ func (serv *Service) RefreshTokens(ctx context.Context, refresh_token string) (*
 	}
 	return res, nil
 }
+
+// Функция LogOut пользователя(удаление refresh-token)
+func (serv *Service) LogOut(ctx context.Context, refresh_token string) error {
+	hash_refresh_token := sha256.Sum256([]byte(refresh_token)) // хэшируем для бд
+	err := serv.repo.DeleteRefreshByRefreshtoken(ctx, hash_refresh_token[:])
+	if err != nil {
+		return err
+	}
+	return nil
+}

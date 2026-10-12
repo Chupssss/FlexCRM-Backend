@@ -385,6 +385,15 @@ paths:
               example:
                 code: INVALID_REFRESH_TOKEN
                 message: Необходимо повторно войти в систему
+        '405':
+          description: Неверный метод запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: METHOD_NOT_ALLOWED
+                message: Неверный метод запроса
         '500':
           description: Внутренняя ошибка сервера
           content:
@@ -410,6 +419,24 @@ paths:
               description: Сбрасывает auth cookies через Max-Age=0
               schema:
                 type: string
+        '405':
+          description: Неверный метод запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: METHOD_NOT_ALLOWED
+                message: Неверный метод запроса
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось удалить токены
   /api/general/:
     get:
       tags:
