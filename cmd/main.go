@@ -7,9 +7,12 @@ import (
 	"time"
 
 	database "FlexCRM-Backend/db"
+	"FlexCRM-Backend/internal/auth"
 	"FlexCRM-Backend/internal/config"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/routers"
+	"FlexCRM-Backend/internal/token"
+	"FlexCRM-Backend/internal/users"
 
 	"github.com/joho/godotenv"
 )
@@ -41,18 +44,32 @@ func main() {
 		log.Fatal("database connection failed: ", err)
 	}
 	defer db_connect.Close()
+
 	log.Println("database connected")
 
+	// Создание структуры для работы JWT
+	tokenManager := token.NewTokenManager(cfg.JWTSecret)
+
 	// Инициализация health сервиса
-	conn := health.SaveRepoConn(db_connect)           //Сохранение подключения к БД в структуре
-	healthservice := health.NewService(conn)          // Инициализация mainservice
-	healthhandler := health.NewHandler(healthservice) // Создание health хэндлера
+	conn := health.SaveRepoConn(db_connect)
+	healthservice := health.NewService(conn)
+	healthhandler := health.NewHandler(healthservice)
 
-	// Инициализация auths сервиса
+	connAuth := auth.SaveRepoConn(db_connect)
+	authservice := auth.NewService(connAuth, tokenManager)
+	authhandler := auth.NewHandler(authservice)
+	// Инициализация users сервиса
+	usersRepo := users.NewRepository(db_connect)
+	usersService := users.NewService(usersRepo)
+	usersHandler := users.NewHandler(usersService)
 
+	// Инициализация эндпоинтов
 	routers.SetupRouter(mux, routers.Dependencies{
 		HealthHandler: healthhandler,
-	}) // Инициализация эндпоинтов
+		AuthHandler:   authhandler,
+		Tokenmanager:  tokenManager,
+		UsersHandler:  usersHandler,
+	})
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal("server error: ", err)

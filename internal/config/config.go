@@ -16,6 +16,8 @@ type Config struct {
 	DBName     string
 
 	DatabaseURL string
+
+	JWTSecret string
 }
 
 func Load() *Config {
@@ -27,6 +29,11 @@ func Load() *Config {
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
 		DBName:     getEnv("DB_NAME", "flexcrm"),
+		JWTSecret:  getEnv("JWT_SECRET", ""),
+	}
+
+	if cfg.JWTSecret == "" {
+		log.Fatal("JWT_SECRET is required")
 	}
 
 	if cfg.DBPassword == "" {

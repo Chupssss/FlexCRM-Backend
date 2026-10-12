@@ -2,7 +2,6 @@ package users
 
 import (
 	"time"
-	"uuid"
 
 	"github.com/google/uuid"
 )
@@ -11,7 +10,7 @@ type User struct {
 	ID            uuid.UUID
 	CompanyID     uuid.UUID
 	Email         string
-	Password_Hash string
+	Password_Hash string `json:"-"`
 	First_Name    string
 	Last_Name     *string
 	Role          string
