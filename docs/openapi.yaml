@@ -331,6 +331,15 @@ paths:
               example:
                 code: USER_INACTIVE
                 message: Пользователь деактивирован
+        '405':
+          description: Неверный метод запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: METHOD_NOT_ALLOWED
+                message: Неверный метод запроса
         '500':
           description: Внутренняя ошибка сервера
           content:

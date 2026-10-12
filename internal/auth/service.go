@@ -8,6 +8,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -53,11 +54,43 @@ func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthRe
 	if err != nil {
 		return nil, err
 	}
+	res, err := serv.CreateTokens(ctx, user_id, company_id, role)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Функция Логина пользователя
+func (serv *Service) Login(ctx context.Context, us *user) (*AuthResult, error) {
+	user_data, err := serv.repo.GetByEmail(ctx, us.Email)
+	if err != nil {
+		return nil, err
+	}
+	// Проверка пароля
+	err = bcrypt.CompareHashAndPassword(user_data.Passwordhash, []byte(us.Password))
+	if err != nil {
+		log.Printf("Password doesn`t compare:%v", err)
+		return nil, ErrDifferentPass
+	}
+	// Проверка активирован ли пользователь
+	if !user_data.IsActive {
+		return nil, ErrUserDeactive
+	}
+	res, err := serv.CreateTokens(ctx, user_data.User_id, user_data.Company_id, user_data.Role)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// Функция по созданию refresh и access токенов
+func (serv *Service) CreateTokens(ctx context.Context, user_id, company_id uuid.UUID, role string) (*AuthResult, error) {
 	// создание refresh токена
 	refresh_token := rand.Text()
 	refresh_expires := time.Now().AddDate(0, 0, 30)
 	hash_refresh_token := sha256.Sum256([]byte(refresh_token))
-	err = serv.repo.CreateRefreshToken(ctx, user_id, hash_refresh_token[:], refresh_expires)
+	err := serv.repo.CreateRefreshToken(ctx, user_id, hash_refresh_token[:], refresh_expires)
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -78,4 +79,32 @@ func (repo *RepoConn) CreateRefreshToken(ctx context.Context, id uuid.UUID, hash
 		return err
 	}
 	return nil
+}
+
+// структура с данными пользователя
+type User_data struct {
+	User_id      uuid.UUID
+	Company_id   uuid.UUID
+	Role         string
+	IsActive     bool
+	Passwordhash []byte
+}
+
+// Функция логина пользователя
+func (repo *RepoConn) GetByEmail(ctx context.Context, email string) (*User_data, error) {
+	var user User_data
+	err := repo.conn.QueryRow(ctx, "SELECT id, company_id, role, is_active, password_hash FROM users WHERE email = $1", email).Scan(&user.User_id,
+		&user.Company_id,
+		&user.Role,
+		&user.IsActive,
+		&user.Passwordhash,
+	)
+	if err != nil {
+		log.Printf("no row where emails are similar: %v", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &user, nil
 }

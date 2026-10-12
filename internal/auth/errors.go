@@ -9,4 +9,6 @@ import (
 var (
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrDifferentPass      = errors.New("password doesnt coincide")
+	ErrUserDeactive       = errors.New("user doenst active")
 )

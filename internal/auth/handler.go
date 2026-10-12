@@ -72,25 +72,86 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	h.setCookie(w, result) // Установка Cookie
+	w.WriteHeader(http.StatusCreated)
+}
+
+// Структура хранящая данные юзера
+type user struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// Функция логина пользователя
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperr := customerror.AppError{HTTPStatus: 405, Code: "METHOD_NOT_ALLOWED", Message: "Неверный метод запроса"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: method not allowed")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second) // контекст, если пользователь закроет соединение или мы будет действовать более 5 секунд
+	defer cancel()
+
+	var us user
+	err := json.NewDecoder(r.Body).Decode(&us)
+	if err != nil || us.Email == "" || us.Password == "" {
+		apperr := customerror.AppError{HTTPStatus: 400, Code: "INVALID_REQUEST_BODY", Message: "Некорректное тело запроса"}
+		customerror.SendError(w, &apperr)
+		log.Printf("%v", err)
+		return
+	}
+	result, err := h.service.Login(ctx, &us)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrUserNotFound):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_CREDENTIALS",
+				Message:    "Неверный email или пароль",
+				HTTPStatus: 401,
+			})
+			return
+		case errors.Is(err, ErrDifferentPass):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_CREDENTIALS",
+				Message:    "Неверный email или пароль",
+				HTTPStatus: 401,
+			})
+			return
+		case errors.Is(err, ErrUserDeactive):
+			customerror.SendError(w, &customerror.AppError{Code: "USER_INACTIVE",
+				Message:    "Пользователь деактивирован",
+				HTTPStatus: 403,
+			})
+			return
+		default:
+			apperr := customerror.AppError{HTTPStatus: 500, Code: "INTERNAL_ERROR", Message: "Не удалось выполнить вход"}
+			customerror.SendError(w, &apperr)
+			return
+		}
+	}
+	h.setCookie(w, result) // установка Cookie
+	w.WriteHeader(http.StatusOK)
+}
+
+// Функция установки Cookie в Response
+func (h *Handler) setCookie(w http.ResponseWriter, tokens *AuthResult) {
 	// Установка access token в Cookie. Потом заменить secure на true, после появления https
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access-token",
-		Value:    result.AccessToken,
+		Value:    tokens.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
-		Expires:  result.AccessExpiresAt,
+		Expires:  tokens.AccessExpiresAt,
 	})
 	// Установка refresh token в Cookie. Потом заменить Secure на true, после появления https
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh-token",
-		Value:    result.RefreshToken,
+		Value:    tokens.RefreshToken,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
-		Expires:  result.RefreshExpiresAt,
+		Expires:  tokens.RefreshExpiresAt,
 	})
-	w.WriteHeader(http.StatusCreated)
 }
