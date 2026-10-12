@@ -63,7 +63,7 @@ func (manager *TokenManager) VerifyToken(tokenStr string) (*CustomClaims, error)
 		return nil, err
 	}
 	if !token.Valid {
-		return nil, fmt.Errorf("invalid error")
+		return nil, fmt.Errorf("invalid token")
 	}
 	return claims, nil
 }
