@@ -63,7 +63,7 @@ func (serv *Service) Register(ctx context.Context, user *admin_company) (*AuthRe
 
 // Функция Логина пользователя
 func (serv *Service) Login(ctx context.Context, us *user) (*AuthResult, error) {
-	user_data, err := serv.repo.GetByEmail(ctx, us.Email)
+	user_data, err := serv.repo.GetUserByEmail(ctx, us.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -107,4 +107,29 @@ func (serv *Service) CreateTokens(ctx context.Context, user_id, company_id uuid.
 		RefreshExpiresAt: refresh_expires,
 	}
 	return &res, nil
+}
+
+// Обработка Refresh token
+func (serv *Service) RefreshTokens(ctx context.Context, refresh_token string) (*AuthResult, error) {
+	hash_refresh_token := sha256.Sum256([]byte(refresh_token)) // хэшируем для бд
+	user_id, exp_at, err := serv.repo.GetRefreshDataByRefreshtoken(ctx, hash_refresh_token[:])
+	if err != nil {
+		return nil, err
+	}
+	if time.Now().After(exp_at) {
+		return nil, ErrRefreshTokenExpired
+	}
+	err = serv.repo.DeleteRefreshByRefreshtoken(ctx, hash_refresh_token[:])
+	if err != nil {
+		return nil, err
+	}
+	company_id, role, err := serv.repo.GetUserByid(ctx, user_id)
+	if err != nil {
+		return nil, err
+	}
+	res, err := serv.CreateTokens(ctx, user_id, company_id, role)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }

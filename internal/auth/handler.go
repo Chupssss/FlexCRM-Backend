@@ -155,3 +155,54 @@ func (h *Handler) setCookie(w http.ResponseWriter, tokens *AuthResult) {
 		Expires:  tokens.RefreshExpiresAt,
 	})
 }
+
+// Функция обновления Refresh и access tokens
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperr := customerror.AppError{HTTPStatus: 405, Code: "METHOD_NOT_ALLOWED", Message: "Неверный метод запроса"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: method not allowed")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second) // контекст, если пользователь закроет соединение или мы будет действовать более 5 секунд
+	defer cancel()
+
+	cookie, err := r.Cookie("refresh-token")
+	if err != nil {
+		log.Printf("error refresh cookie: %v", err)
+		customerror.SendError(w, &customerror.AppError{Code: "INVALID_REFRESH_TOKEN",
+			Message:    "Необходимо повторно войти в систему",
+			HTTPStatus: 401,
+		})
+		return
+	}
+	result, err := h.service.RefreshTokens(ctx, cookie.Value)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRefreshTokenNotFound):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_REFRESH_TOKEN",
+				Message:    "Необходимо повторно войти в систему",
+				HTTPStatus: 401,
+			})
+			return
+		case errors.Is(err, ErrRefreshTokenExpired):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_REFRESH_TOKEN",
+				Message:    "Необходимо повторно войти в систему",
+				HTTPStatus: 401,
+			})
+			return
+		case errors.Is(err, ErrUserNotFound):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_REFRESH_TOKEN",
+				Message:    "Необходимо повторно войти в систему",
+				HTTPStatus: 401,
+			})
+			return
+		default:
+			apperr := customerror.AppError{HTTPStatus: 500, Code: "INTERNAL_ERROR", Message: "Не удалось обновить токены"}
+			customerror.SendError(w, &apperr)
+			return
+		}
+	}
+	h.setCookie(w, result)
+	w.WriteHeader(http.StatusNoContent)
+}

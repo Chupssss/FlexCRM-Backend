@@ -90,8 +90,8 @@ type User_data struct {
 	Passwordhash []byte
 }
 
-// Функция логина пользователя
-func (repo *RepoConn) GetByEmail(ctx context.Context, email string) (*User_data, error) {
+// Функция получения данных пользователя по его email
+func (repo *RepoConn) GetUserByEmail(ctx context.Context, email string) (*User_data, error) {
 	var user User_data
 	err := repo.conn.QueryRow(ctx, "SELECT id, company_id, role, is_active, password_hash FROM users WHERE email = $1", email).Scan(&user.User_id,
 		&user.Company_id,
@@ -107,4 +107,48 @@ func (repo *RepoConn) GetByEmail(ctx context.Context, email string) (*User_data,
 		return nil, err
 	}
 	return &user, nil
+}
+
+// Функция получения id_company и role пользователя по его email
+func (repo *RepoConn) GetUserByid(ctx context.Context, id uuid.UUID) (uuid.UUID, string, error) {
+	var company_id uuid.UUID
+	var role string
+	err := repo.conn.QueryRow(ctx, "SELECT company_id, role FROM users WHERE id = $1", id).Scan(&company_id, &role)
+	if err != nil {
+		log.Printf("no row where user_id are similar: %v", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, "", ErrUserNotFound
+		}
+		return uuid.Nil, "", err
+	}
+	return company_id, role, nil
+}
+
+// Функция получения данных refresh токена по данному refresh токену
+func (repo *RepoConn) GetRefreshDataByRefreshtoken(ctx context.Context, hash_refresh_token []byte) (uuid.UUID, time.Time, error) {
+	var user_id uuid.UUID
+	var expires_at time.Time
+	err := repo.conn.QueryRow(ctx, "SELECT user_id, expires_at FROM refresh_tokens WHERE token_hash = $1", hash_refresh_token).Scan(&user_id, &expires_at)
+	if err != nil {
+		log.Printf("no row where token_hash are similar: %v", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, time.Time{}, ErrRefreshTokenNotFound
+		}
+		return uuid.Nil, time.Time{}, err
+	}
+	return user_id, expires_at, nil
+}
+
+// Функция удаления Refresh token
+func (repo *RepoConn) DeleteRefreshByRefreshtoken(ctx context.Context, hash_refresh_token []byte) error {
+	tag, err := repo.conn.Exec(ctx, "DELETE FROM refresh_tokens WHERE token_hash = $1", hash_refresh_token)
+	if err != nil {
+		log.Printf("error on delete refresh-token: %v", err)
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		log.Printf("no row where token_hash are similar: %v", err)
+		return ErrRefreshTokenNotFound
+	}
+	return nil
 }
