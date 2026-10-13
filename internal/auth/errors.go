@@ -13,4 +13,6 @@ var (
 	ErrUserDeactive         = errors.New("user doenst active")
 	ErrRefreshTokenNotFound = errors.New("refresh-token not found")
 	ErrRefreshTokenExpired  = errors.New("refresh-token expired")
+	ErrInvalidRole          = errors.New("invalid role of user")
+	ErrInvalidPassword      = errors.New("invalid len of password")
 )

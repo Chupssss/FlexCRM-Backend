@@ -2,12 +2,15 @@ package auth
 
 import (
 	"FlexCRM-Backend/internal/customerror"
+	"FlexCRM-Backend/internal/middleware"
 	"context"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -64,6 +67,12 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			customerror.SendError(w, &customerror.AppError{Code: "EMAIL_ALREADY_EXISTS",
 				Message:    "Пользователь с таким email уже зарегистрирован",
 				HTTPStatus: 409,
+			})
+			return
+		case errors.Is(err, ErrInvalidPassword):
+			customerror.SendError(w, &customerror.AppError{Code: "INVALID_REQUEST_BODY",
+				Message:    "Некорректное тело запроса",
+				HTTPStatus: 400,
 			})
 			return
 		default:
@@ -253,4 +262,98 @@ func (h *Handler) LogOut(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Структура содержащая поля для создания Manager и Employee
+type ManagerOrEmployee struct {
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	First_name string `json:"first_name"`
+	Last_name  string `json:"last_name"`
+	Role       string `json:"role"`
+}
+
+// Структура для возврата id в json
+type ResponseId struct {
+	User_Id uuid.UUID `json:"id"`
+}
+
+// Функция регистрация пользователя компании
+func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		apperr := customerror.AppError{HTTPStatus: 405, Code: "METHOD_NOT_ALLOWED", Message: "Неверный метод запроса"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: method not allowed")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second) // контекст, если пользователь закроет соединение или мы будет действовать более 5 секунд
+	defer cancel()
+
+	current_user, ok := middleware.UserFromContext(ctx) // получение данных пользователя совешающего запрос
+	// Не удалось достать данные пользователя из контекста
+	if !ok {
+		apperr := customerror.AppError{HTTPStatus: 401, Code: "UNAUTHORIZED", Message: "Требуется авторизация"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: can`t catch user_data from context")
+		return
+	}
+	// Перенести в service
+	// Если у пользователя нет роли Администратора
+	if current_user.Role != "ADMIN" {
+		apperr := customerror.AppError{HTTPStatus: 403, Code: "FORBIDDEN", Message: "Создавать пользователей может только администратор"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: user isn`t Administrator")
+		return
+	}
+	var user ManagerOrEmployee
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		apperr := customerror.AppError{HTTPStatus: 400, Code: "VALIDATION_ERROR", Message: "Проверьте данные пользователя"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error on Decode: %v", err)
+		return
+	}
+	if user.Email == "" || user.First_name == "" || user.Last_name == "" || user.Password == "" || user.Role == "" {
+		apperr := customerror.AppError{HTTPStatus: 400, Code: "VALIDATION_ERROR", Message: "Проверьте данные пользователя"}
+		customerror.SendError(w, &apperr)
+		log.Printf("error: invalid user data", err)
+		return
+	}
+	user_id, err := h.service.RegisterUser(ctx, &user, current_user.Company_id)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidRole):
+			customerror.SendError(w, &customerror.AppError{Code: "VALIDATION_ERROR",
+				Message:    "Проверьте данные пользователя",
+				HTTPStatus: 400,
+			})
+			return
+		case errors.Is(err, ErrInvalidPassword):
+			customerror.SendError(w, &customerror.AppError{Code: "VALIDATION_ERROR",
+				Message:    "Проверьте данные пользователя",
+				HTTPStatus: 400,
+			})
+			return
+		case errors.Is(err, ErrEmailAlreadyExists):
+			customerror.SendError(w, &customerror.AppError{Code: "EMAIL_ALREADY_EXISTS",
+				Message:    "Пользователь с таким email уже зарегистрирован",
+				HTTPStatus: 409,
+			})
+			return
+		default:
+			apperr := customerror.AppError{HTTPStatus: 500, Code: "INTERNAL_ERROR", Message: "Не удалось зарегистрировать пользователя"}
+			customerror.SendError(w, &apperr)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	err = json.NewEncoder(w).Encode(ResponseId{
+		User_Id: user_id,
+	})
+	if err != nil {
+		log.Printf("%v", err)
+		return
+	}
 }

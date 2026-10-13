@@ -24,17 +24,17 @@ func SaveRepoConn(conn *pgxpool.Pool) *RepoConn {
 	}
 }
 
-type CreateUserParameters struct {
+type CreateAdminCompanyParams struct {
 	Company_name string
 	Email        string
-	PasswordHash []byte
+	PasswordHash string
 	First_name   string
 	Last_name    string
 	Role         string
 }
 
 // Функция создания пользователя и компании в БД
-func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateUserParameters) (uuid.UUID, uuid.UUID, error) {
+func (repo *RepoConn) CreateUserCompany(ctx context.Context, user *CreateAdminCompanyParams) (uuid.UUID, uuid.UUID, error) {
 	tx, err := repo.conn.Begin(ctx) // начало транзакции
 	if err != nil {
 		log.Printf("%v", err)
@@ -151,4 +151,31 @@ func (repo *RepoConn) DeleteRefreshByRefreshtoken(ctx context.Context, hash_refr
 		return ErrRefreshTokenNotFound
 	}
 	return nil
+}
+
+// Структура с данными о пользователе
+type UserData struct {
+	Company_id   uuid.UUID
+	Email        string
+	PasswordHash string
+	First_name   string
+	Last_name    string
+	Role         string
+}
+
+// Функция создания пользователя в БД
+func (repo *RepoConn) CreateUser(ctx context.Context, user_data *UserData) (uuid.UUID, error) {
+	var user_id uuid.UUID
+	err := repo.conn.QueryRow(ctx, "INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", user_data.Company_id, user_data.Email, user_data.PasswordHash, user_data.First_name, user_data.Last_name, user_data.Role, time.Now(), time.Now()).Scan(&user_id)
+	if err != nil {
+		var pgerr *pgconn.PgError
+		log.Printf("%v", err)
+		if errors.As(err, &pgerr) {
+			if pgerr.Code == "23505" {
+				return uuid.Nil, ErrEmailAlreadyExists
+			}
+		}
+		return uuid.Nil, err
+	}
+	return user_id, nil
 }

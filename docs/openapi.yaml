@@ -13,30 +13,21 @@ paths:
 
         В одной транзакции создаёт новую компанию и её первого пользователя
 
-
         с ролью `ADMIN`.
-
 
         Поля `role` и `is_active` frontend не передаёт: backend автоматически
 
-
         устанавливает `role = ADMIN` и `is_active = true`.
-
 
         Сначала backend создаёт компанию, затем создаёт администратора с
 
-
         `company_id` созданной компании. Если один из шагов завершается ошибкой,
-
 
         вся транзакция откатывается.
 
-
         Description для компании заполняется отдельно.
 
-
         Access- и refresh-токены возвращаются только в HttpOnly cookies и не
-
 
         включаются в JSON-ответ.
 
@@ -63,7 +54,6 @@ paths:
               description: '
 
                 Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
-
 
                 В production cookies должны иметь атрибуты Secure и SameSite.
 
@@ -125,35 +115,28 @@ paths:
               example:
                 code: INTERNAL_ERROR
                 message: Не удалось зарегистрировать компанию и администратора
-  /api/register/manager/:
+  /api/register/user:
     post:
       tags:
       - Auth
-      summary: Зарегистрировать менеджера
-      description: '
-
-        Создаёт нового пользователя с ролью `MANAGER` в компании текущего администратора.
+      summary: Зарегистрировать пользователя
+      description: 'Создаёт нового пользователя с ролью `MANAGER` или `EMPLOYEE` в компании текущего администратора.
 
 
         Endpoint доступен только авторизованному пользователю с ролью `ADMIN`.
 
 
-        Поля `company_id`, `role` и `is_active` frontend не передаёт: backend определяет
+        Поля `company_id` и `is_active` frontend не передаёт: backend определяет компанию по текущему
+        администратору и автоматически устанавливает `is_active = true`.
 
 
-        компанию по текущему администратору и автоматически устанавливает
+        Поле `role` frontend передаёт со значением `MANAGER` или `EMPLOYEE`. Значение `ADMIN` для этого
+        endpoint недопустимо.
 
 
-        `role = MANAGER` и `is_active = true`.
-
-
-        После создания менеджера новые access- и refresh-токены не выдаются:
-
-
-        текущая сессия администратора остаётся без изменений.
-
-        '
-      operationId: registerManager
+        После создания пользователя новые access- и refresh-токены не выдаются: текущая сессия администратора
+        остаётся без изменений.'
+      operationId: registerUser
       security:
       - accessCookieAuth: []
       requestBody:
@@ -161,27 +144,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterManagerRequest'
+              $ref: '#/components/schemas/RegisterUserRequest'
             example:
-              email: manager\@flexcrm.ru
+              email: user@flexcrm.ru
               password: StrongPassword123!
               first_name: Анна
               last_name: Смирнова
+              role: MANAGER
       responses:
         '201':
-          description: Менеджер успешно зарегистрирован
+          description: Пользователь успешно зарегистрирован
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthenticatedUser'
+                $ref: '#/components/schemas/RegisterUserResponse'
               example:
                 id: 00000000-0000-4000-8000-000000000012
-                email: manager\@flexcrm.ru
-                first_name: Анна
-                last_name: Смирнова
-                role: MANAGER
-                is_active: true
-                company_id: 00000000-0000-4000-8000-000000000101
         '400':
           description: Некорректный запрос или ошибка валидации
           content:
@@ -190,7 +168,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: VALIDATION_ERROR
-                message: Проверьте данные менеджера
+                message: Проверьте данные пользователя
         '401':
           description: Пользователь не авторизован или access-токен недействителен
           content:
@@ -208,7 +186,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: FORBIDDEN
-                message: Создавать менеджеров может только администратор
+                message: Создавать пользователей может только администратор
         '409':
           description: Пользователь с таким email уже существует
           content:
@@ -226,33 +204,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: INTERNAL_ERROR
-                message: Не удалось зарегистрировать менеджера
-  /api/register/worker/:
-    post:
-      tags:
-      - Auth
-      summary: Зарегистрировать сотрудника
-      description: '
-
-        Зарезервированный endpoint для создания сотрудника администратором.
-
-
-        Тело запроса и итоговый контракт будут описаны позднее.
-
-        '
-      operationId: registerWorker
-      security:
-      - accessCookieAuth: []
-      responses:
-        '501':
-          description: Endpoint пока не реализован
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                code: NOT_IMPLEMENTED
-                message: Регистрация сотрудника пока не реализована
+                message: Не удалось зарегистрировать пользователя
   /api/login/:
     post:
       tags:
@@ -262,9 +214,7 @@ paths:
 
         Авторизует пользователя с ролью `ADMIN`, `MANAGER` или `EMPLOYEE` по email и паролю.
 
-
         Access- и refresh-токены устанавливаются в HttpOnly cookies и не
-
 
         возвращаются в JSON.
 
@@ -288,7 +238,6 @@ paths:
               description: '
 
                 Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
-
 
                 В production cookies должны иметь атрибуты Secure и SameSite.
 
@@ -358,9 +307,7 @@ paths:
 
         Проверяет refresh-токен из HttpOnly cookie. При успешной проверке
 
-
         выпускает новый access-токен и при необходимости ротирует refresh-токен.
-
 
         Тело запроса отсутствует.
 
@@ -446,15 +393,11 @@ paths:
 
         Возвращает информацию о текущем пользователе, общую статистику
 
-
         компании, последние активности и ближайшие задачи.
-
 
         Параметр `limit` одновременно ограничивает количество элементов
 
-
         в массивах `activities` и `tasks`.
-
 
         Данные возвращаются только для компании текущего пользователя.
 
@@ -544,21 +487,15 @@ paths:
 
         Возвращает список клиентов компании текущего пользователя.
 
-
         Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
-
 
         данные физического лица, а `company_name` может иметь значение `null`.
 
-
         Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
-
 
         данные представителя компании
 
-
         Поле `responsible_user_name` содержит полное имя ответственного сотрудника
-
 
         или `null`, если ответственный не назначен.
 
@@ -633,27 +570,19 @@ paths:
 
         Возвращает подробную информацию о конкретном клиенте компании
 
-
         текущего пользователя.
-
 
         Для клиента типа `PERSON` поля `first_name` и `last_name` содержат
 
-
         данные физического лица, `company_name` имеет значение `null`,
-
 
         а `contacts` является пустым массивом.
 
-
         Для клиента типа `COMPANY` поля `first_name` и `last_name` содержат
-
 
         данные представителя юридического лица, `company_name` — название
 
-
         компании, а `contacts` — остальных сотрудников этой компании.
-
 
         Представитель юридического лица в массиве `contacts` не дублируется.
 
@@ -771,7 +700,6 @@ paths:
 
         Возвращает активных сотрудников компании текущего пользователя.
 
-
         Используется для заполнения выпадающего списка ответственных при создании сделки.
 
         '
@@ -821,7 +749,6 @@ paths:
 
         Возвращает активные воронки компании текущего пользователя.
 
-
         Компания определяется backend по авторизованному пользователю.
 
         '
@@ -868,7 +795,6 @@ paths:
       description: '
 
         Возвращает все стадии выбранной воронки, отсортированные по `position`.
-
 
         Воронка должна принадлежать компании текущего пользователя.
 
@@ -949,24 +875,17 @@ paths:
 
         Возвращает все активные воронки компании текущего пользователя.
 
-
         Для каждой воронки возвращаются её стадии, а для каждой стадии — сделки.
-
 
         Стадии сортируются по полю `position`. Пустые стадии также возвращаются
 
-
         с пустым массивом `deals`.
-
 
         В каждой сделке возвращаются данные клиента. Для клиента типа `PERSON`
 
-
         поле `company_name` имеет значение `null`, и frontend использует
 
-
         `first_name` и `last_name`. Для клиента типа `COMPANY` frontend может
-
 
         использовать `company_name`.
 
@@ -1063,18 +982,13 @@ paths:
 
         Создаёт новую сделку в выбранной воронке и на выбранной стадии.
 
-
         `company_id` и `created_by` не передаются frontend: backend определяет
-
 
         их по текущему авторизованному пользователю.
 
-
         Backend проверяет, что клиент, ответственный сотрудник и воронка
 
-
         принадлежат компании текущего пользователя, а стадия принадлежит
-
 
         выбранной воронке.
 
@@ -1216,7 +1130,7 @@ components:
           maxLength: 100
           description: Фамилия администратора
           example: Ахметов
-    RegisterManagerRequest:
+    RegisterUserRequest:
       type: object
       additionalProperties: false
       required:
@@ -1224,33 +1138,52 @@ components:
       - password
       - first_name
       - last_name
+      - role
       properties:
         email:
           type: string
           format: email
           maxLength: 255
-          description: Email создаваемого менеджера
-          example: manager\@flexcrm.ru
+          description: Email создаваемого пользователя
+          example: user@flexcrm.ru
         password:
           type: string
           format: password
           minLength: 8
           maxLength: 72
           writeOnly: true
-          description: Пароль менеджера; сохраняется только в виде хеша
+          description: Пароль создаваемого пользователя; сохраняется только в виде хеша
           example: StrongPassword123!
         first_name:
           type: string
           minLength: 1
           maxLength: 100
-          description: Имя менеджера
+          description: Имя создаваемого пользователя
           example: Анна
         last_name:
           type: string
           minLength: 1
           maxLength: 100
-          description: Фамилия менеджера
+          description: Фамилия создаваемого пользователя
           example: Смирнова
+        role:
+          type: string
+          description: Роль создаваемого пользователя
+          enum:
+          - MANAGER
+          - EMPLOYEE
+          example: MANAGER
+    RegisterUserResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID созданного пользователя
+          example: 00000000-0000-4000-8000-000000000012
     LoginRequest:
       type: object
       additionalProperties: false
@@ -1602,7 +1535,6 @@ components:
           description: '
 
             Другие сотрудники юридического лица. Для клиента типа PERSON
-
 
             возвращается пустой массив. Представитель из clients здесь не дублируется.
 
