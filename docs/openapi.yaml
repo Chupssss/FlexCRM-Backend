@@ -6,6 +6,251 @@ info:
   description: REST API системы FlexCRM
 
 paths:
+  /api/register/:
+    post:
+      tags:
+        - Auth
+      summary: Зарегистрировать компанию и администратора
+      description: |
+        В одной транзакции создаёт новую компанию и её первого пользователя
+        с ролью `ADMIN`.
+
+        Поля `role` и `is_active` frontend не передаёт: backend автоматически
+        устанавливает `role = ADMIN` и `is_active = true`.
+
+        Сначала backend создаёт компанию, затем создаёт администратора с
+        `company_id` созданной компании. Если один из шагов завершается ошибкой,
+        вся транзакция откатывается.
+        Description для компании заполняется отдельно.
+
+        Access- и refresh-токены возвращаются только в HttpOnly cookies и не
+        включаются в JSON-ответ.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              company_name: ООО Ромашка
+              email: admin@flexcrm.ru
+              password: StrongPassword123!
+              first_name: Булат
+              last_name: Ахметов
+      responses:
+        "201":
+          description: Компания и администратор успешно зарегистрированы
+          headers:
+            Set-Cookie:
+              description: |
+                Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
+                В production cookies должны иметь атрибуты Secure и SameSite.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+              example:
+                user:
+                  id: "00000000-0000-4000-8000-000000000001"
+                  email: admin@flexcrm.ru
+                  first_name: Булат
+                  last_name: Ахметов
+                  role: ADMIN
+                  is_active: true
+                  company_id: "00000000-0000-4000-8000-000000000101"
+                company:
+                  id: "00000000-0000-4000-8000-000000000101"
+                  name: ООО Ромашка
+        "400":
+          description: Некорректные регистрационные данные
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_REGISTRATION_DATA
+                message: Проверьте название компании и данные администратора
+        "409":
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: EMAIL_ALREADY_EXISTS
+                message: Пользователь с таким email уже зарегистрирован
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось зарегистрировать компанию и администратора
+
+  /api/register/worker/:
+    post:
+      tags:
+        - Auth
+      summary: Зарегистрировать сотрудника
+      description: |
+        Зарезервированный endpoint для создания сотрудника администратором.
+        Тело запроса и итоговый контракт будут описаны позднее.
+      operationId: registerWorker
+      security:
+        - accessCookieAuth: []
+      responses:
+        "501":
+          description: Endpoint пока не реализован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: NOT_IMPLEMENTED
+                message: Регистрация сотрудника пока не реализована
+
+  /api/login/:
+    post:
+      tags:
+        - Auth
+      summary: Войти в систему
+      description: |
+        Авторизует администратора или сотрудника по email и паролю.
+        Access- и refresh-токены устанавливаются в HttpOnly cookies и не
+        возвращаются в JSON.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: user@flexcrm.ru
+              password: StrongPassword123!
+      responses:
+        "200":
+          description: Авторизация выполнена успешно
+          headers:
+            Set-Cookie:
+              description: |
+                Устанавливает HttpOnly cookies `access_token` и `refresh_token`.
+                В production cookies должны иметь атрибуты Secure и SameSite.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+              example:
+                user:
+                  id: "00000000-0000-4000-8000-000000000011"
+                  email: user@flexcrm.ru
+                  first_name: Иван
+                  last_name: Петров
+                  role: EMPLOYEE
+                  is_active: true
+                  company_id: "00000000-0000-4000-8000-000000000101"
+        "400":
+          description: Некорректное тело запроса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_REQUEST_BODY
+                message: Некорректное тело запроса
+        "401":
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_CREDENTIALS
+                message: Неверный email или пароль
+        "403":
+          description: Пользователь деактивирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: USER_INACTIVE
+                message: Пользователь деактивирован
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось выполнить вход
+
+  /api/refresh/:
+    post:
+      tags:
+        - Auth
+      summary: Обновить токены
+      description: |
+        Проверяет refresh-токен из HttpOnly cookie. При успешной проверке
+        выпускает новый access-токен и при необходимости ротирует refresh-токен.
+        Тело запроса отсутствует.
+      operationId: refreshTokens
+      security:
+        - refreshCookieAuth: []
+      responses:
+        "204":
+          description: Токены успешно обновлены
+          headers:
+            Set-Cookie:
+              description: Устанавливает обновлённые HttpOnly auth cookies
+              schema:
+                type: string
+        "401":
+          description: Refresh-токен отсутствует, истёк или недействителен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_REFRESH_TOKEN
+                message: Необходимо повторно войти в систему
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INTERNAL_ERROR
+                message: Не удалось обновить токены
+
+  /api/logout/:
+    post:
+      tags:
+        - Auth
+      summary: Выйти из системы
+      description: Удаляет access- и refresh-cookies. Тело запроса отсутствует.
+      operationId: logout
+      security: []
+      responses:
+        "204":
+          description: Выход выполнен, cookies удалены
+          headers:
+            Set-Cookie:
+              description: Сбрасывает auth cookies через Max-Age=0
+              schema:
+                type: string
+
   /api/general/:
     get:
       tags:
@@ -21,7 +266,7 @@ paths:
         Данные возвращаются только для компании текущего пользователя.
       operationId: getGeneralInformation
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       parameters:
         - name: limit
           in: query
@@ -114,7 +359,7 @@ paths:
         или `null`, если ответственный не назначен.
       operationId: getClients
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       responses:
         "200":
           description: Список клиентов успешно получен
@@ -164,15 +409,6 @@ paths:
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "403":
-          description: Пользователь не имеет доступа к списку клиентов
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                code: FORBIDDEN
-                message: Доступ запрещён
         "500":
           description: Внутренняя ошибка сервера
           content:
@@ -203,7 +439,7 @@ paths:
         Представитель юридического лица в массиве `contacts` не дублируется.
       operationId: getClientById
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       parameters:
         - name: id
           in: path
@@ -316,7 +552,7 @@ paths:
         Используется для заполнения выпадающего списка ответственных при создании сделки.
       operationId: getUsers
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       responses:
         "200":
           description: Список сотрудников успешно получен
@@ -362,7 +598,7 @@ paths:
         Компания определяется backend по авторизованному пользователю.
       operationId: getPipelines
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       responses:
         "200":
           description: Список воронок успешно получен
@@ -406,7 +642,7 @@ paths:
         Воронка должна принадлежать компании текущего пользователя.
       operationId: getPipelineStages
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       parameters:
         - name: pipeline_id
           in: path
@@ -490,7 +726,7 @@ paths:
         использовать `company_name`.
       operationId: getDealsBoard
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       responses:
         "200":
           description: Воронки со стадиями и сделками успешно получены
@@ -563,15 +799,6 @@ paths:
               example:
                 code: UNAUTHORIZED
                 message: Требуется авторизация
-        "403":
-          description: Пользователь не имеет доступа к сделкам
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              example:
-                code: FORBIDDEN
-                message: Доступ запрещён
         "500":
           description: Внутренняя ошибка сервера
           content:
@@ -597,7 +824,7 @@ paths:
         выбранной воронке.
       operationId: createDeal
       security:
-        - bearerAuth: []
+        - accessCookieAuth: []
       requestBody:
         required: true
         content:
@@ -680,13 +907,173 @@ paths:
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: JWT access-токен текущего пользователя
+    accessCookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: JWT access-токен в HttpOnly cookie
+
+    refreshCookieAuth:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: JWT refresh-токен в HttpOnly cookie
 
   schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - company_name
+        - email
+        - password
+        - first_name
+        - last_name
+      properties:
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Название создаваемой компании
+          example: ООО Ромашка
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email администратора новой компании
+          example: admin@flexcrm.ru
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          writeOnly: true
+          description: Пароль администратора; сохраняется только в виде хеша
+          example: StrongPassword123!
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Имя администратора
+          example: Булат
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Фамилия администратора
+          example: Ахметов
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email пользователя
+          example: user@flexcrm.ru
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 72
+          writeOnly: true
+          description: Пароль пользователя
+          example: StrongPassword123!
+
+    RegisterResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - user
+        - company
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthenticatedUser"
+        company:
+          $ref: "#/components/schemas/RegisteredCompany"
+
+    RegisteredCompany:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID созданной компании
+          example: "00000000-0000-4000-8000-000000000101"
+        name:
+          type: string
+          maxLength: 255
+          description: Название созданной компании
+          example: ООО Ромашка
+
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - user
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthenticatedUser"
+
+    AuthenticatedUser:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - email
+        - first_name
+        - last_name
+        - role
+        - is_active
+        - company_id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID пользователя
+          example: "00000000-0000-4000-8000-000000000011"
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: user@flexcrm.ru
+        first_name:
+          type: string
+          maxLength: 100
+          description: Имя пользователя
+          example: Иван
+        last_name:
+          type: string
+          maxLength: 100
+          description: Фамилия пользователя
+          example: Петров
+        role:
+          type: string
+          description: Роль пользователя; при самостоятельной регистрации всегда ADMIN
+          enum:
+            - ADMIN
+            - MANAGER
+            - EMPLOYEE
+          example: ADMIN
+        is_active:
+          type: boolean
+          description: Признак активности пользователя; при регистрации устанавливается true
+          example: true
+        company_id:
+          type: string
+          format: uuid
+          description: UUID компании пользователя
+          example: "00000000-0000-4000-8000-000000000101"
+
     GeneralResponse:
       type: object
       required:

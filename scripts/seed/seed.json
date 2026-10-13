@@ -1,0 +1,77 @@
+{
+  "company": {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "name": "Flex Test Company",
+    "description": "Тестовая компания FlexCRM"
+  },
+  "users": [
+    {
+      "id": "22222222-2222-2222-2222-222222222221",
+      "email": "bulat@test.local",
+      "passwordHash": "test_hash",
+      "firstName": "Булат",
+      "lastName": "Иванов",
+      "role": "ADMIN"
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "email": "egor@test.local",
+      "passwordHash": "test_hash",
+      "firstName": "Егор",
+      "lastName": "Канатов",
+      "role": "MANAGER"
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222223",
+      "email": "yarik@test.local",
+      "passwordHash": "test_hash",
+      "firstName": "Ярик",
+      "lastName": "Сидоров",
+      "role": "EMPLOYEE"
+    }
+  ],
+  "clients": [
+    {
+      "id": "33333333-3333-3333-3333-333333333331",
+      "responsibleUserId": "22222222-2222-2222-2222-222222222221",
+      "createdBy": "22222222-2222-2222-2222-222222222221",
+      "clientType": "PERSON",
+      "firstName": "Иван",
+      "lastName": "Петров",
+      "email": "ivan@test.local",
+      "phone": "+79991112233",
+      "description": "Тестовый физический клиент"
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333332",
+      "responsibleUserId": "22222222-2222-2222-2222-222222222222",
+      "createdBy": "22222222-2222-2222-2222-222222222221",
+      "clientType": "PERSON",
+      "firstName": "Мария",
+      "lastName": "Волкова",
+      "email": "maria@test.local",
+      "phone": "+79992223344",
+      "description": "Второй тестовый клиент"
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "responsibleUserId": "22222222-2222-2222-2222-222222222221",
+      "createdBy": "22222222-2222-2222-2222-222222222221",
+      "clientType": "COMPANY",
+      "companyName": "ООО Ромашка",
+      "email": "info@romashka.test",
+      "phone": "+79993334455",
+      "description": "Тестовая организация"
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333334",
+      "responsibleUserId": "22222222-2222-2222-2222-222222222223",
+      "createdBy": "22222222-2222-2222-2222-222222222221",
+      "clientType": "COMPANY",
+      "companyName": "TechSoft",
+      "email": "info@techsoft.test",
+      "phone": "+79994445566",
+      "description": "Тестовая IT-компания"
+    }
+  ]
+}

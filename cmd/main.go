@@ -7,6 +7,7 @@ import (
 	"time"
 
 	database "FlexCRM-Backend/db"
+	"FlexCRM-Backend/internal/clients"
 	"FlexCRM-Backend/internal/config"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/routers"
@@ -48,10 +49,15 @@ func main() {
 	healthservice := health.NewService(conn)          // Инициализация mainservice
 	healthhandler := health.NewHandler(healthservice) // Создание health хэндлера
 
+	clientsRepository := clients.NewRepository(db_connect)
+	clientsService := clients.NewService(clientsRepository)
+	clientsHandler := clients.NewHandler(clientsService)
+
 	// Инициализация auths сервиса
 
 	routers.SetupRouter(mux, routers.Dependencies{
-		HealthHandler: healthhandler,
+		HealthHandler:  healthhandler,
+		ClientsHandler: clientsHandler,
 	}) // Инициализация эндпоинтов
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
