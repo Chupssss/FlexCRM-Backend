@@ -106,10 +106,26 @@ func (s *Service) Update(
 	return s.repo.Update(ctx, userID, companyID, req)
 }
 
-func (s *Service) GetById(
+func (s *Service) GetAll(
 	ctx context.Context,
-	id uuid.UUID,
+	companyID uuid.UUID,
+) ([]User, error) {
+
+	if companyID == uuid.Nil {
+		return nil, ErrInvalidUserData
+	}
+
+	return s.repo.GetAll(ctx, companyID)
+}
+func (s *Service) GetByID(
+	ctx context.Context,
+	userID uuid.UUID,
 	companyID uuid.UUID,
 ) (*User, error) {
-	return s.repo.GetById(ctx, id, companyID)
+
+	if userID == uuid.Nil || companyID == uuid.Nil {
+		return nil, ErrInvalidUserData
+	}
+
+	return s.repo.GetById(ctx, userID, companyID)
 }
