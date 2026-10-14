@@ -117,7 +117,7 @@ func (s *Service) GetAll(
 
 	return s.repo.GetAll(ctx, companyID)
 }
-func (s *Service) GetByID(
+func (s *Service) GetById(
 	ctx context.Context,
 	userID uuid.UUID,
 	companyID uuid.UUID,

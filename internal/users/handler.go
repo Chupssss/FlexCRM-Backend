@@ -21,14 +21,12 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	// Получаем пользователя из JWT-контекста
 	currentUser, ok := middleware.UserFromContext(r.Context())
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Только ADMIN может создавать сотрудников
 	if currentUser.Role != "ADMIN" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -41,7 +39,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Передаём companyID из JWT в Service
 	createdUser, err := h.service.Create(
 		r.Context(),
 		currentUser.Company_id,
