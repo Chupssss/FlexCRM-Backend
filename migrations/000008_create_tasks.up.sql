@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS tasks(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id      UUID  NOT NULL,
     created_by      UUID  NOT NULL,
     assignee_id     UUID NULL,
