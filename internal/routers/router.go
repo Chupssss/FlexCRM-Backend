@@ -1,12 +1,14 @@
 package routers
 
 import (
+	"net/http"
+
 	"FlexCRM-Backend/internal/auth"
 	"FlexCRM-Backend/internal/clients"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/middleware"
 	"FlexCRM-Backend/internal/token"
-	"net/http"
+	"FlexCRM-Backend/internal/users"
 )
 
 type Dependencies struct {
@@ -14,21 +16,31 @@ type Dependencies struct {
 	AuthHandler    *auth.Handler
 	ClientsHandler *clients.Handler
 	Tokenmanager   *token.TokenManager
+	UsersHandler   *users.Handler
 }
 
 func SetupRouter(mux *http.ServeMux, deps Dependencies) {
-	// Пример вызова хэндлера с верификацией пользователя и сохранением данных в контексте
-	//mux.Handle("GET /api/health", middleware.Auth(deps.Tokenmanager)(http.HandlerFunc(deps.HealthHandler.HealthCheck)))
-	mux.HandleFunc("GET /api/health", http.HandlerFunc(deps.HealthHandler.HealthCheck))
-	mux.HandleFunc("GET /api/health/{$}", http.HandlerFunc(deps.HealthHandler.HealthCheck))
+	// Health
+	mux.HandleFunc("GET /api/health", deps.HealthHandler.HealthCheck)
+	mux.HandleFunc("GET /api/health/{$}", deps.HealthHandler.HealthCheck)
+
+	// Auth
 	mux.HandleFunc("POST /api/register", deps.AuthHandler.Register)
 	mux.HandleFunc("POST /api/login", deps.AuthHandler.Login)
 	mux.HandleFunc("POST /api/logout", deps.AuthHandler.LogOut)
 	mux.HandleFunc("POST /api/refresh", deps.AuthHandler.Refresh)
-	mux.Handle("POST /api/register/user", middleware.Auth(deps.Tokenmanager)(http.HandlerFunc(deps.AuthHandler.RegisterUser)))
 
+	mux.Handle(
+		"POST /api/register/user",
+		middleware.Auth(deps.Tokenmanager)(
+			http.HandlerFunc(deps.AuthHandler.RegisterUser),
+		),
+	)
+
+	// Clients
 	h := deps.ClientsHandler
-	routes := []struct {
+
+	clientRoutes := []struct {
 		method  string
 		path    string
 		handler http.HandlerFunc
@@ -49,15 +61,54 @@ func SetupRouter(mux *http.ServeMux, deps Dependencies) {
 		{"GET", "/{id}/tags", h.GetClientTags},
 		{"PUT", "/{id}/tags", h.SetTags},
 	}
+
 	for _, prefix := range []string{"/api/clients", "/api/v1/clients"} {
-		for _, route := range routes {
-			mux.HandleFunc(route.method+" "+prefix+route.path, route.handler)
-			mux.HandleFunc(route.method+" "+prefix+route.path+"/{$}", route.handler)
+		for _, route := range clientRoutes {
+			mux.HandleFunc(
+				route.method+" "+prefix+route.path,
+				route.handler,
+			)
+			mux.HandleFunc(
+				route.method+" "+prefix+route.path+"/{$}",
+				route.handler,
+			)
 		}
 	}
+
+	// Users
+	usersHandler := deps.UsersHandler
+
+	userRoutes := []struct {
+		method  string
+		path    string
+		handler http.HandlerFunc
+	}{
+		{"GET", "", usersHandler.GetAll},
+		{"GET", "/{id}", usersHandler.GetById},
+		{"POST", "", usersHandler.Create},
+		{"PATCH", "/{id}", usersHandler.Update},
+	}
+
+	for _, prefix := range []string{"/api/users", "/api/v1/users"} {
+		for _, route := range userRoutes {
+			handler := middleware.Auth(deps.Tokenmanager)(
+				route.handler,
+			)
+
+			mux.Handle(
+				route.method+" "+prefix+route.path,
+				handler,
+			)
+
+			mux.Handle(
+				route.method+" "+prefix+route.path+"/{$}",
+				handler,
+			)
+		}
+	}
+
+	// Tags
 	for _, prefix := range []string{"/api", "/api/v1"} {
-		mux.HandleFunc("GET "+prefix+"/users", h.GetUsers)
-		mux.HandleFunc("GET "+prefix+"/users/{$}", h.GetUsers)
 		mux.HandleFunc("GET "+prefix+"/tags", h.GetTags)
 		mux.HandleFunc("GET "+prefix+"/tags/{$}", h.GetTags)
 		mux.HandleFunc("POST "+prefix+"/tags", h.CreateTag)

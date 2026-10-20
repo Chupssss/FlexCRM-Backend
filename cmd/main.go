@@ -13,18 +13,20 @@ import (
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/routers"
 	"FlexCRM-Backend/internal/token"
+	"FlexCRM-Backend/internal/users"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
+	// Загрузка переменных окружения
+	if err := godotenv.Load(); err != nil {
 		log.Println("config: error loading .env file, use base variables")
 	}
 
 	cfg := config.Load()
 
+	// HTTP сервер
 	mux := http.NewServeMux()
 
 	server := &http.Server{
@@ -36,41 +38,58 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Подключение к PostgreSQL
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
 	defer cancel()
 
-	db_connect, err := database.NewPostgresPool(ctx, cfg.DatabaseURL)
+	dbConnect, err := database.NewPostgresPool(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal("database connection failed: ", err)
 	}
-	defer db_connect.Close()
+	defer dbConnect.Close()
+
 	log.Println("database connected")
 
-	// Создание структуры для работы JWT
+	// JWT
 	tokenManager := token.NewTokenManager(cfg.JWTSecret)
 
-	// Инициализация health сервиса
-	connHealth := health.SaveRepoConn(db_connect)     //Сохранение подключения к БД в структуре
-	healthservice := health.NewService(connHealth)    // Инициализация mainservice
-	healthhandler := health.NewHandler(healthservice) // Создание health хэндлера
+	// Health
+	healthRepo := health.SaveRepoConn(dbConnect)
+	healthService := health.NewService(healthRepo)
+	healthHandler := health.NewHandler(healthService)
 
-	clientsRepository := clients.NewRepository(db_connect)
+	// Clients
+	clientsRepository := clients.NewRepository(dbConnect)
 	clientsService := clients.NewService(clientsRepository)
 	clientsHandler := clients.NewHandler(clientsService)
 
-	// Инициализация auths сервиса
-	connAuth := auth.SaveRepoConn(db_connect)
-	authservice := auth.NewService(connAuth, tokenManager)
-	authhandler := auth.NewHandler(authservice)
+	// Auth
+	authRepo := auth.SaveRepoConn(dbConnect)
+	authService := auth.NewService(authRepo, tokenManager)
+	authHandler := auth.NewHandler(authService)
 
+	// Users
+	usersRepository := users.NewRepository(dbConnect)
+	usersService := users.NewService(usersRepository)
+	usersHandler := users.NewHandler(usersService)
+
+	// Регистрация маршрутов
 	routers.SetupRouter(mux, routers.Dependencies{
-		HealthHandler:  healthhandler,
-		AuthHandler:    authhandler,
+		HealthHandler:  healthHandler,
+		AuthHandler:    authHandler,
 		ClientsHandler: clientsHandler,
+		UsersHandler:   usersHandler,
 		Tokenmanager:   tokenManager,
-	}) // Инициализация эндпоинтов
+	})
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	log.Println("server starting on ", cfg.BaseURL)
+
+	// Запуск сервера
+	if err := server.ListenAndServe(); err != nil &&
+		err != http.ErrServerClosed {
 		log.Fatal("server error: ", err)
 	}
 }
