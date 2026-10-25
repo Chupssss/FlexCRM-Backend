@@ -68,3 +68,10 @@ func UserFromContext(ctx context.Context) (CurrentUser, bool) {
 	user, ok := ctx.Value(userContextKey).(CurrentUser)
 	return user, ok
 }
+func CompanyIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	user, ok := ctx.Value(userContextKey).(CurrentUser)
+	if !ok {
+		return uuid.Nil, false
+	}
+	return user.Company_id, ok
+}
