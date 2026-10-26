@@ -7,16 +7,18 @@ import (
 	"FlexCRM-Backend/internal/clients"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/middleware"
+	"FlexCRM-Backend/internal/pipelines"
 	"FlexCRM-Backend/internal/token"
 	"FlexCRM-Backend/internal/users"
 )
 
 type Dependencies struct {
-	HealthHandler  *health.Handler
-	AuthHandler    *auth.Handler
-	ClientsHandler *clients.Handler
-	Tokenmanager   *token.TokenManager
-	UsersHandler   *users.Handler
+	HealthHandler    *health.Handler
+	AuthHandler      *auth.Handler
+	ClientsHandler   *clients.Handler
+	Tokenmanager     *token.TokenManager
+	UsersHandler     *users.Handler
+	PipelinesHandler *pipelines.Handler
 }
 
 func SetupRouter(mux *http.ServeMux, deps Dependencies) {
@@ -114,4 +116,9 @@ func SetupRouter(mux *http.ServeMux, deps Dependencies) {
 		mux.HandleFunc("POST "+prefix+"/tags", h.CreateTag)
 		mux.HandleFunc("POST "+prefix+"/tags/{$}", h.CreateTag)
 	}
+
+	mux.Handle(
+		"GET /api/v1/pipelines/options",
+		middleware.Auth(deps.Tokenmanager)(http.HandlerFunc(deps.PipelinesHandler.Get_Option)),
+	)
 }

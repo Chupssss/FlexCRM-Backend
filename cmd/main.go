@@ -11,6 +11,7 @@ import (
 	"FlexCRM-Backend/internal/clients"
 	"FlexCRM-Backend/internal/config"
 	"FlexCRM-Backend/internal/health"
+	"FlexCRM-Backend/internal/pipelines"
 	"FlexCRM-Backend/internal/routers"
 	"FlexCRM-Backend/internal/token"
 	"FlexCRM-Backend/internal/users"
@@ -76,13 +77,19 @@ func main() {
 	usersService := users.NewService(usersRepository)
 	usersHandler := users.NewHandler(usersService)
 
+	// Pipelines
+	pipelinesRepository := pipelines.NewRepository(dbConnect)
+	pipelinesService := pipelines.NewService(pipelinesRepository)
+	pipelinesHandler := pipelines.NewHandler(pipelinesService)
+
 	// Регистрация маршрутов
 	routers.SetupRouter(mux, routers.Dependencies{
-		HealthHandler:  healthHandler,
-		AuthHandler:    authHandler,
-		ClientsHandler: clientsHandler,
-		UsersHandler:   usersHandler,
-		Tokenmanager:   tokenManager,
+		HealthHandler:    healthHandler,
+		AuthHandler:      authHandler,
+		ClientsHandler:   clientsHandler,
+		UsersHandler:     usersHandler,
+		PipelinesHandler: pipelinesHandler,
+		Tokenmanager:     tokenManager,
 	})
 
 	log.Println("server starting on ", cfg.BaseURL)
