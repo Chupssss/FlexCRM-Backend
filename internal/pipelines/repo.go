@@ -40,3 +40,35 @@ func (r *Repository) Get_Option(ctx context.Context, companyID uuid.UUID) ([]Pip
 	}
 	return options, rows.Err()
 }
+
+func (r *Repository) Get_Stages(ctx context.Context, companyID uuid.UUID, id uuid.UUID) ([]Stage, error) {
+	rows, err := r.db.Query(ctx,
+		`
+	select ps.id, ps.pipeline_id, ps.name, ps.position, ps.stage_type
+	FROM pipeline_stages ps
+	JOIN pipelines p ON p.id = ps.pipeline_id
+	WHERE ps.pipeline_id = $1
+  	AND p.company_id = $2
+	ORDER BY ps.position ASC;
+	`, id, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	stages := make([]Stage, 0)
+	for rows.Next() {
+		var stage Stage
+		err := rows.Scan(
+			&stage.ID,
+			&stage.PipelineID,
+			&stage.Name,
+			&stage.Position,
+			&stage.StageType,
+		)
+		if err != nil {
+			return nil, err
+		}
+		stages = append(stages, stage)
+	}
+	return stages, rows.Err()
+}
