@@ -73,13 +73,17 @@ func SetupRouter(mux *http.ServeMux, deps Dependencies) {
 
 	for _, prefix := range []string{"/api/clients", "/api/v1/clients"} {
 		for _, route := range clientRoutes {
-			mux.HandleFunc(
+			var handler http.Handler = route.handler
+			if route.method == "GET" && route.path == "/{id}" {
+				handler = middleware.Auth(deps.Tokenmanager)(handler)
+			}
+			mux.Handle(
 				route.method+" "+prefix+route.path,
-				route.handler,
+				handler,
 			)
-			mux.HandleFunc(
+			mux.Handle(
 				route.method+" "+prefix+route.path+"/{$}",
-				route.handler,
+				handler,
 			)
 		}
 	}

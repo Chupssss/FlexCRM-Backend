@@ -51,8 +51,14 @@ func (r *Repository) GetAll(ctx context.Context, companyID uuid.UUID, filter Fil
 }
 
 func (r *Repository) GetByID(ctx context.Context, companyID, id uuid.UUID) (*ClientDetail, error) {
+	// Все части карточки читаются из одного снимка, включая контакты и комментарий.
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, err
+	}
+	defer rollback(tx)
 	var c ClientDetail
-	err := r.db.QueryRow(ctx, `SELECT `+clientFields+`,c.middle_name,c.responsible_user_id,c.description,c.created_at,c.updated_at`+clientJoins+`WHERE c.company_id=$1 AND c.id=$2`, companyID, id).Scan(&c.ID, &c.Type, &c.FirstName, &c.LastName, &c.CompanyName, &c.Email, &c.Phone, &c.ResponsibleName, &c.MiddleName, &c.ResponsibleID, &c.Description, &c.CreatedAt, &c.UpdatedAt)
+	err = tx.QueryRow(ctx, `SELECT `+clientFields+`,c.middle_name,c.responsible_user_id,c.description,c.created_at,c.updated_at`+clientJoins+`WHERE c.company_id=$1 AND c.id=$2`, companyID, id).Scan(&c.ID, &c.Type, &c.FirstName, &c.LastName, &c.CompanyName, &c.Email, &c.Phone, &c.ResponsibleName, &c.MiddleName, &c.ResponsibleID, &c.Description, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -61,7 +67,7 @@ func (r *Repository) GetByID(ctx context.Context, companyID, id uuid.UUID) (*Cli
 	}
 	c.Tags = make([]string, 0)
 	c.Contacts = make([]Contact, 0)
-	rows, err := r.db.Query(ctx, `SELECT DISTINCT t.name FROM tags t JOIN client_tags ct ON ct.tag_id=t.id WHERE ct.client_id=$1 AND t.company_id=$2 ORDER BY t.name`, id, companyID)
+	rows, err := tx.Query(ctx, `SELECT DISTINCT t.name FROM tags t JOIN client_tags ct ON ct.tag_id=t.id WHERE ct.client_id=$1 AND t.company_id=$2 ORDER BY t.name`, id, companyID)
 	if err != nil {
 		return nil, err
 	}
@@ -79,23 +85,36 @@ func (r *Repository) GetByID(ctx context.Context, companyID, id uuid.UUID) (*Cli
 		return nil, err
 	}
 	var last LastComment
-	err = r.db.QueryRow(ctx, `SELECT cm.text,concat_ws(' ',u.first_name,u.last_name),cm.created_at FROM comments cm JOIN users u ON u.id=cm.author_id AND u.company_id=cm.company_id WHERE cm.client_id=$1 AND cm.company_id=$2 ORDER BY cm.created_at DESC,cm.id DESC LIMIT 1`, id, companyID).Scan(&last.Text, &last.AuthorName, &last.CreatedAt)
+	err = tx.QueryRow(ctx, `SELECT cm.text,concat_ws(' ',u.first_name,u.last_name),cm.created_at FROM comments cm JOIN users u ON u.id=cm.author_id AND u.company_id=cm.company_id WHERE cm.client_id=$1 AND cm.company_id=$2 ORDER BY cm.created_at DESC,cm.id DESC LIMIT 1`, id, companyID).Scan(&last.Text, &last.AuthorName, &last.CreatedAt)
 	if err == nil {
 		c.LastComment = &last
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 	if c.Type == "COMPANY" {
-		contacts, err := r.GetContacts(ctx, companyID, id)
+		rows, err := tx.Query(ctx, `SELECT id,first_name,last_name,position,email,phone,is_primary
+   FROM contacts WHERE client_id=$1 AND is_primary=FALSE ORDER BY created_at,id`, id)
 		if err != nil {
 			return nil, err
 		}
-		for _, contact := range contacts {
-			if !contact.IsPrimary {
-				c.Contacts = append(c.Contacts, contact)
+		for rows.Next() {
+			var contact Contact
+			if err := rows.Scan(&contact.ID, &contact.FirstName, &contact.LastName, &contact.Position, &contact.Email, &contact.Phone, &contact.IsPrimary); err != nil {
+				rows.Close()
+				return nil, err
 			}
+			c.Contacts = append(c.Contacts, contact)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
 		}
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
 	return &c, nil
 }
 

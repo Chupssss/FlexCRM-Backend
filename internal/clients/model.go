@@ -83,3 +83,35 @@ type Filter struct {
 	Type          string
 	ResponsibleID *uuid.UUID
 }
+
+// Profile — ответ карточки клиента, строго по ClientDetail из Swagger.
+// Поля записи БД и признак основного контакта в этот контракт не входят.
+type Profile struct {
+	Client
+	Description *string          `json:"description"`
+	LastComment *LastComment     `json:"last_comment"`
+	Tags        []string         `json:"tags"`
+	Contacts    []ProfileContact `json:"contacts"`
+}
+
+type ProfileContact struct {
+	ID        uuid.UUID `json:"id"`
+	FirstName string    `json:"first_name"`
+	LastName  *string   `json:"last_name"`
+	Phone     *string   `json:"phone"`
+	Email     *string   `json:"email"`
+	Position  *string   `json:"position"`
+}
+
+func profileFromDetail(detail *ClientDetail) Profile {
+	profile := Profile{Client: detail.Client, Description: detail.Description, LastComment: detail.LastComment,
+		Tags: make([]string, 0, len(detail.Tags)), Contacts: make([]ProfileContact, 0, len(detail.Contacts))}
+	profile.Tags = append(profile.Tags, detail.Tags...)
+	if detail.Type == "COMPANY" {
+		for _, contact := range detail.Contacts {
+			profile.Contacts = append(profile.Contacts, ProfileContact{ID: contact.ID, FirstName: contact.FirstName,
+				LastName: contact.LastName, Phone: contact.Phone, Email: contact.Email, Position: contact.Position})
+		}
+	}
+	return profile
+}

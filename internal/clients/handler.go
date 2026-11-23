@@ -1,12 +1,15 @@
 package clients
 
 import (
+	"FlexCRM-Backend/internal/middleware"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -95,20 +98,28 @@ func (h *Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	user, authorized := middleware.UserFromContext(r.Context())
+	if !authorized || user.Company_id == uuid.Nil || user.User_id == uuid.Nil {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Требуется авторизация")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
-	data, err := h.service.GetByID(r.Context(), demoCompanyID, id)
+	data, err := h.service.GetByID(ctx, user.Company_id, id)
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, http.StatusNotFound, "CLIENT_NOT_FOUND", "Клиент не найден")
 		return
 	}
 	if err != nil {
-		handleError(w, err)
+		log.Printf("clients: profile: %v", err)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Не удалось получить профиль клиента")
 		return
 	}
-	writeJSON(w, http.StatusOK, data)
+	writeJSON(w, http.StatusOK, profileFromDetail(data))
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
