@@ -10,6 +10,7 @@ import (
 	"FlexCRM-Backend/internal/auth"
 	"FlexCRM-Backend/internal/clients"
 	"FlexCRM-Backend/internal/config"
+	"FlexCRM-Backend/internal/general"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/pipelines"
 	"FlexCRM-Backend/internal/routers"
@@ -82,8 +83,14 @@ func main() {
 	pipelinesService := pipelines.NewService(pipelinesRepository)
 	pipelinesHandler := pipelines.NewHandler(pipelinesService)
 
+	// Главная страница
+	generalRepository := general.NewRepository(dbConnect)
+	generalService := general.NewService(generalRepository)
+	generalHandler := general.NewHandler(generalService)
+
 	// Регистрация маршрутов
 	routers.SetupRouter(mux, routers.Dependencies{
+		GeneralHandler:   generalHandler,
 		HealthHandler:    healthHandler,
 		AuthHandler:      authHandler,
 		ClientsHandler:   clientsHandler,

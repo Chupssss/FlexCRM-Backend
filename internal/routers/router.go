@@ -5,6 +5,7 @@ import (
 
 	"FlexCRM-Backend/internal/auth"
 	"FlexCRM-Backend/internal/clients"
+	"FlexCRM-Backend/internal/general"
 	"FlexCRM-Backend/internal/health"
 	"FlexCRM-Backend/internal/middleware"
 	"FlexCRM-Backend/internal/pipelines"
@@ -13,6 +14,7 @@ import (
 )
 
 type Dependencies struct {
+	GeneralHandler   *general.Handler
 	HealthHandler    *health.Handler
 	AuthHandler      *auth.Handler
 	ClientsHandler   *clients.Handler
@@ -38,6 +40,11 @@ func SetupRouter(mux *http.ServeMux, deps Dependencies) {
 			http.HandlerFunc(deps.AuthHandler.RegisterUser),
 		),
 	)
+
+	// Главная страница
+	generalHandler := middleware.Auth(deps.Tokenmanager)(http.HandlerFunc(deps.GeneralHandler.Get))
+	mux.Handle("GET /api/general", generalHandler)
+	mux.Handle("GET /api/general/{$}", generalHandler)
 
 	// Clients
 	h := deps.ClientsHandler
