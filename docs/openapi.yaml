@@ -60,17 +60,6 @@ paths:
                 '
               schema:
                 type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RegisterResponse'
-              example:
-                user:
-                  first_name: Булат
-                  last_name: Ахметов
-                  role: ADMIN
-                company:
-                  name: ООО Ромашка
         '400':
           description: Некорректный запрос или ошибка валидации
           content:
@@ -244,15 +233,6 @@ paths:
                 '
               schema:
                 type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-              example:
-                user:
-                  first_name: Иван
-                  last_name: Петров
-                  role: EMPLOYEE
         '400':
           description: Некорректное тело запроса
           content:
